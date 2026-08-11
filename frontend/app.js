@@ -214,45 +214,50 @@ async function fetchStatus(){
 }
 setInterval(fetchStatus, 3000); fetchStatus();
 
-// Logs streaming
+// Logs streaming - NO SCROLL MODE - Fixed 8 lines max
 function addLogToStream(log, prepend=false){
   if(logsPaused) return;
-  if(logsStream.querySelector('.log-empty')) logsStream.innerHTML='';
+  const empty = logsStream.querySelector('.log-empty');
+  if(empty) empty.remove();
   const div = document.createElement('div');
   div.className='log-line';
   const date = new Date(log.timestamp);
-  const timeStr = date.toLocaleTimeString().split(' ')[0]+'.'+String(date.getMilliseconds()).padStart(3,'0');
-  div.innerHTML=`<span class="lt">${timeStr}</span><span class="ll ${log.level}">${log.level}</span><span class="ls">${log.source}</span><span class="lm">${log.message}</span>`;
+  const timeStr = date.toLocaleTimeString().split(' ')[0];
+  div.innerHTML=`<span class="lt">${timeStr}</span><span class="ll ${log.level}">${log.level}</span><span class="ls">${log.source}</span><span class="lm">${log.message.slice(0,60)}</span>`;
   if(prepend) logsStream.prepend(div); else logsStream.appendChild(div);
-  if(logsStream.children.length>200){ logsStream.removeChild(logsStream.firstChild); }
-  logsStream.scrollTop = logsStream.scrollHeight;
+  // NO SCROLL: Keep only 8 lines max, no scroll
+  while(logsStream.children.length>8){ logsStream.removeChild(logsStream.firstChild); }
+  // No scrollTop - keep hidden
+  const counter = document.getElementById('log-counter');
+  if(counter) counter.textContent = `${logsStream.children.length}/8`;
 }
 async function fetchLogs(){
   try{
-    const res = await fetch(`${API_BASE}/api/logs?limit=80`);
+    const res = await fetch(`${API_BASE}/api/logs?limit=8`);
     const data = await res.json();
     logsStream.innerHTML='';
-    data.logs.forEach(l=>addLogToStream(l));
+    data.logs.slice(-8).forEach(l=>addLogToStream(l));
   }catch{}
 }
 
-// Memory
+// Memory - NO SCROLL - 3 items max
 async function fetchMemories(){
   try{
     const res = await fetch(`${API_BASE}/api/memory`);
     const data = await res.json();
     if(data.memories && Object.keys(data.memories).length>0){
-      memoryList.innerHTML = Object.entries(data.memories).map(([k,v])=>`<div class="mem-item"><strong>${k}:</strong> ${v.value.slice(0,80)}</div>`).join('');
-    } else memoryList.innerHTML='<div class="empty">No memories - memory cores empty, Sir</div>';
+      const entries = Object.entries(data.memories).slice(-3);
+      memoryList.innerHTML = entries.map(([k,v])=>`<div class="mem-item"><strong>${k}:</strong> ${v.value.slice(0,40)}</div>`).join('');
+    } else memoryList.innerHTML='<div class="empty">No memories - cores empty</div>';
   }catch{}
 }
 async function fetchReminders(){
   try{
     const res = await fetch(`${API_BASE}/api/reminders`);
     const data = await res.json();
-    const pending = data.pending||[];
-    if(pending.length>0) reminderList.innerHTML=pending.map(r=>`<div class="mem-item">${r.id}. ${r.text} <small style="color:#6a8aaa">(${r.time})</small></div>`).join('');
-    else reminderList.innerHTML='<div class="empty">All clear, Sir - no pending tasks</div>';
+    const pending = (data.pending||[]).slice(-3);
+    if(pending.length>0) reminderList.innerHTML=pending.map(r=>`<div class="mem-item">${r.id}. ${r.text.slice(0,30)}</div>`).join('');
+    else reminderList.innerHTML='<div class="empty">All clear</div>';
   }catch{}
 }
 
@@ -277,14 +282,13 @@ async function fetchArenaStatus(){
 }
 async function fetchArenaConversation(){
   try{
-    const res = await fetch(`${API_BASE}/api/arena/conversation?limit=8`);
-    const data = await res.json(); const conv = data.conversation||[];
-    if(arenaMsgCountEl) arenaMsgCountEl.textContent=`${data.status?.messages_exchanged||conv.length} MSGS`;
-    if(conv.length===0){ arenaConversationEl.innerHTML='<div class="empty">Workshop idle - awaiting link</div>'; return; }
+    const res = await fetch(`${API_BASE}/api/arena/conversation?limit=3`);
+    const data = await res.json(); const conv = (data.conversation||[]).slice(-3);
+    if(arenaMsgCountEl) arenaMsgCountEl.textContent=`${data.status?.messages_exchanged||conv.length}`;
+    if(conv.length===0){ arenaConversationEl.innerHTML='<div class="empty">Workshop idle</div>'; return; }
     arenaConversationEl.innerHTML = conv.slice().reverse().map(entry=>{
-      const from = entry.from==='arena'?'🏭 ARENA':'🤖 JARVIS'; const color = entry.from==='arena'?'#ffaa00':'#00d4ff';
-      const time = new Date(entry.timestamp).toLocaleTimeString();
-      return `<div class="log-item"><div style="color:${color};font-weight:bold;font-size:9px">${from} <span style="color:#6a8aaa;font-weight:normal">${time}</span></div><div style="color:#c8e8ff;margin-top:2px">${entry.message.slice(0,120)}</div></div>`;
+      const from = entry.from==='arena'?'🏭':'🤖'; const color = entry.from==='arena'?'#ffaa00':'#00d4ff';
+      return `<div class="log-item"><div style="color:${color};font-weight:bold;font-size:8px">${from} ${entry.message.slice(0,36)}</div></div>`;
     }).join('');
   }catch{}
 }
@@ -393,11 +397,14 @@ async function doIntelSearch(q){
 intelSearchBtn.addEventListener('click', ()=> doIntelSearch(intelSearchInput.value));
 intelSearchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') doIntelSearch(intelSearchInput.value); });
 
-// Chat
+// Chat - NO SCROLL MODE - 4 messages max visible
 function addMessage(text, sender='jarvis', meta=''){
   const div=document.createElement('div'); div.className=`message ${sender}`;
-  div.innerHTML=`<div class="content">${formatMessage(text)}</div>${meta?`<div class="meta">${meta}</div>`:''}`;
-  chatContainer.appendChild(div); chatContainer.scrollTop=chatContainer.scrollHeight; return div;
+  div.innerHTML=`<div class="content">${formatMessage(text.slice(0,200))}</div>${meta?`<div class="meta">${meta.slice(0,40)}</div>`:''}`;
+  chatContainer.appendChild(div);
+  // NO SCROLL: Keep only 4 messages max
+  while(chatContainer.children.length>4){ chatContainer.removeChild(chatContainer.firstChild); }
+  return div;
 }
 function formatMessage(text){
   return text.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
@@ -412,17 +419,18 @@ function updateState(state, text){
 }
 function addToolLog(toolCalls){
   if(!toolCalls||toolCalls.length===0) return;
-  if(toolLog.querySelector('.log-empty')) toolLog.innerHTML='';
+  const empty = toolLog.querySelector('.log-empty');
+  if(empty) empty.remove();
   toolCalls.forEach(tc=>{
     const div=document.createElement('div'); div.className='log-item';
-    const argsStr=JSON.stringify(tc.args||{}).slice(0,80); const resultStr=JSON.stringify(tc.result||{}).slice(0,150);
+    const argsStr=JSON.stringify(tc.args||{}).slice(0,40); const resultStr=JSON.stringify(tc.result||{}).slice(0,60);
     div.innerHTML=`<div class="t-name">> ${tc.tool}</div><div class="t-args">${argsStr}</div><div class="t-result">${resultStr}</div>`;
     toolLog.prepend(div);
-    // Auto open browser if tool is open_browser
     if(tc.tool==='open_browser' && tc.result?.url){ openBrowser(tc.result.url); }
     if(tc.tool==='search_web' && tc.args?.query){ doIntelSearch(tc.args.query); }
   });
-  while(toolLog.children.length>25) toolLog.removeChild(toolLog.lastChild);
+  // NO SCROLL: 4 tool logs max
+  while(toolLog.children.length>4) toolLog.removeChild(toolLog.lastChild);
 }
 
 function speak(text){
