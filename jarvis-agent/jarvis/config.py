@@ -5,6 +5,22 @@ from pathlib import Path
 from dataclasses import dataclass, field
 
 
+def _load_dotenv():
+    """Load .env file from workspace or agent home."""
+    try:
+        from dotenv import load_dotenv
+        # Try workspace first, then agent home
+        for p in [Path.cwd() / ".env", Path(__file__).parent.parent / ".env"]:
+            if p.exists():
+                load_dotenv(p, override=False)
+                return
+    except ImportError:
+        pass
+
+
+_load_dotenv()
+
+
 @dataclass
 class Config:
     # LLM

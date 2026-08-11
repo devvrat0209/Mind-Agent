@@ -281,28 +281,30 @@ class DeviceTools:
 
     def _tool_screenshot(self, path: str = "") -> dict:
         save_path = path or "/tmp/jarvis_screenshot.png"
+        # VPS: try virtual framebuffer first
         try:
-            # Try scrot (Linux)
+            result = subprocess.run(
+                ["xvfb-run", "--auto-servernum", "scrot", save_path],
+                capture_output=True, timeout=10,
+            )
+            if result.returncode == 0:
+                return {"output": f"Screenshot saved: {save_path}", "error": False, "data": {"path": save_path}}
+        except FileNotFoundError:
+            pass
+        try:
             result = subprocess.run(["scrot", save_path], capture_output=True, timeout=5)
             if result.returncode == 0:
                 return {"output": f"Screenshot saved: {save_path}", "error": False, "data": {"path": save_path}}
         except FileNotFoundError:
             pass
         try:
-            # Try gnome-screenshot
-            result = subprocess.run(["gnome-screenshot", "-f", save_path], capture_output=True, timeout=5)
-            if result.returncode == 0:
-                return {"output": f"Screenshot saved: {save_path}", "error": False, "data": {"path": save_path}}
-        except FileNotFoundError:
-            pass
-        try:
-            # Try Python Pillow ImageGrab
             from PIL import ImageGrab
             img = ImageGrab.grab()
             img.save(save_path)
             return {"output": f"Screenshot saved: {save_path}", "error": False, "data": {"path": save_path}}
-        except Exception as e:
-            return {"output": f"Screenshot failed: {e}. Install scrot or use a display server.", "error": True, "data": {}}
+        except Exception:
+            pass
+        return {"output": "No display server. On VPS, install xvfb + scrot for virtual screenshots.", "error": True, "data": {}}
 
     def _tool_clipboard_read(self) -> dict:
         try:
