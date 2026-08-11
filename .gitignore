@@ -1,11 +1,40 @@
-.env
+# JARVIS Advanced (Bun/TS)
+node_modules
+dist
+out
+*.tgz
+coverage
+*.lcov
+/logs
+_.log
+report.*.*.*.*.json
+ui/dist
+ui/public/openwakeword/models
+ui/public/ort
+src/workflows/activepieces/packages/pieces/jarvis/*/dist/
+
+# JARVIS Python Edition Backup
 __pycache__/
 *.pyc
 *.pyo
-memory/*.jsonl
-workspace/*
-!workspace/.gitkeep
-!workspace/README.md
-venv/
-.venv/
+python-edition-backup/__pycache__/
+python-edition-backup/agent/__pycache__/
+
+# JARVIS Data
+.jarvis/
+jarvis.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Env & secrets
+.env
+.env.local
+*.key
+*.pem
+
+# OS
 .DS_Store
+Thumbs.db
+.venv/
+venv/
