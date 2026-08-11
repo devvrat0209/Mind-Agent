@@ -1,6 +1,6 @@
 [project]
 name = "jarvis-agent"
-version = "0.2.0"
+version = "0.3.0"
 description = "A self-editing AI agent — JARVIS that modifies its own code, runs on Telegram, has full device access"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -18,7 +18,6 @@ dependencies = [
 
 [project.scripts]
 jarvis = "jarvis.cli:main"
-jarvis-telegram = "jarvis.telegram_bot:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]
