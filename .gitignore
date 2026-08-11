@@ -38,3 +38,4 @@ jarvis.db
 Thumbs.db
 .venv/
 venv/
+.github/workflows
