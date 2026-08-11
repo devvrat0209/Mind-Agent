@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # JARVIS Self-Editing AI Agent — One-Line Installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/devvrat0209/my-agent/main/jarvis-agent/install.sh | bash
+#
+# Install from main:
+#   curl -fsSL https://raw.githubusercontent.com/devvrat0209/my-agent/main/jarvis-agent/install.sh | bash
+#
+# Install from dev branch:
+#   JARVIS_BRANCH=arena/019ff081-my-agent curl -fsSL https://raw.githubusercontent.com/devvrat0209/my-agent/arena/019ff081-my-agent/jarvis-agent/install.sh | bash
 
 set -euo pipefail
 
@@ -47,6 +52,7 @@ fi
 # ── Install Dir ────────────────────────────────────────────
 INSTALL_DIR="${JARVIS_HOME:-$HOME/.jarvis}"
 REPO_URL="https://github.com/devvrat0209/my-agent.git"
+REPO_BRANCH="${JARVIS_BRANCH:-main}"
 
 if [ -d "$INSTALL_DIR" ] && [ -d "$INSTALL_DIR/.git" ]; then
   info "Updating existing install at $INSTALL_DIR"
@@ -54,7 +60,7 @@ if [ -d "$INSTALL_DIR" ] && [ -d "$INSTALL_DIR/.git" ]; then
   git pull --ff-only 2>/dev/null || { info "Pull failed, re-cloning..."; rm -rf "$INSTALL_DIR" && git clone "$REPO_URL" "$INSTALL_DIR" --depth 1 && cd "$INSTALL_DIR"; }
 else
   info "Cloning to $INSTALL_DIR"
-  git clone "$REPO_URL" "$INSTALL_DIR" --depth 1
+  git clone --branch "$REPO_BRANCH" "$REPO_URL" "$INSTALL_DIR" --depth 1
   cd "$INSTALL_DIR"
 fi
 
