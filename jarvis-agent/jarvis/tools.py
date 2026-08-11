@@ -27,6 +27,11 @@ class ToolRegistry:
     def __init__(self, config):
         self.config = config
         self.edit_stack = []  # for rollback
+
+        # Device tools (full system access)
+        from .device import DeviceTools
+        self.device_tools = DeviceTools(config)
+
         self._tools = {
             "read_file": self.read_file,
             "write_file": self.write_file,
@@ -39,12 +44,32 @@ class ToolRegistry:
             "git_commit": self.git_commit,
             "rollback": self.rollback,
             "search_code": self.search_code,
+            # Device tools
+            "system_info": self._device_call("system_info"),
+            "list_processes": self._device_call("list_processes"),
+            "network_info": self._device_call("network_info"),
+            "disk_usage": self._device_call("disk_usage"),
+            "screenshot": self._device_call("screenshot"),
+            "clipboard_read": self._device_call("clipboard_read"),
+            "clipboard_write": self._device_call("clipboard_write"),
+            "open_app": self._device_call("open_app"),
+            "download_file": self._device_call("download_file"),
+            "notify": self._device_call("notify"),
+            "media_capture": self._device_call("media_capture"),
+            "environment_vars": self._device_call("environment_vars"),
         }
+
+    def _device_call(self, name: str):
+        """Wrap a device tool as a ToolResult-returning callable."""
+        def wrapper(**kwargs):
+            result = self.device_tools.call(name, kwargs)
+            return ToolResult(result["output"], error=result.get("error", False), data=result.get("data", {}))
+        return wrapper
 
     @property
     def tool_schemas(self) -> list[dict]:
         """OpenAI-format tool schemas for the LLM."""
-        return [
+        code_tools = [
             {
                 "type": "function",
                 "function": {
@@ -199,6 +224,7 @@ class ToolRegistry:
                 },
             },
         ]
+        return code_tools + self.device_tools.tool_schemas
 
     def call(self, name: str, args: dict) -> ToolResult:
         """Execute a tool by name."""
