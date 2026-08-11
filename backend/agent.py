@@ -211,7 +211,35 @@ TOOL_DEFINITIONS = [
             "parameters": {"type": "object", "properties": {"limit": {"type": "integer", "description": "Number of messages"}}, "required": []}
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "open_browser",
+            "description": "Open a URL in Jarvis built-in browser - for web browsing, youtube, google etc",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "URL to open, e.g. https://google.com or https://youtube.com"},
+                    "search": {"type": "string", "description": "Optional search query if opening search engine"}
+                },
+                "required": ["url"]
+            }
+        }
+    },
 ]
+
+def _open_browser_tool(url: str, search: str = None):
+    """Tool to open URL in built-in browser"""
+    if not url.startswith("http"):
+        # Try to interpret as search or domain
+        if "." not in url and search is None:
+            # Treat as search query
+            search = url
+            url = f"https://duckduckgo.com/?q={url.replace(' ', '+')}"
+        else:
+            if not url.startswith("http"):
+                url = "https://" + url
+    return {"url": url, "search": search, "success": True, "message": f"Opening {url} in Jarvis browser", "proxy_url": f"/api/browser/proxy?url={url}"}
 
 # Map tool names to functions
 TOOL_MAP = {
@@ -232,6 +260,7 @@ TOOL_MAP = {
     "send_message_to_arena": bridge_tools.send_message_to_arena,
     "ask_arena_for_help": bridge_tools.ask_arena_for_help,
     "get_arena_conversation": bridge_tools.get_arena_conversation,
+    "open_browser": _open_browser_tool,
 }
 
 class JarvisAgent:
@@ -428,6 +457,37 @@ class JarvisAgent:
                 response = f"Arena Link currently {result.get('status','disconnected')}, Sir. Workshop offline. Attempting to re-establish... Use the Arena workshop to sync."
             # Also push a message
             arena_link.push_message("jarvis", f"User queried link status: {user_input} -> Responded: {response}")
+
+        elif "open" in lower and ("browser" in lower or "website" in lower or "youtube" in lower or "google" in lower or "github" in lower or ".com" in lower or "http" in lower):
+            # Extract URL
+            url_match = re.search(r"(https?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9.-]+\.(?:com|org|net|io|ai|dev|co|in)[^\s]*)", user_input, re.I)
+            if url_match:
+                url_raw = url_match.group(1)
+                if not url_raw.startswith("http"):
+                    url_raw = "https://" + url_raw
+                result = _open_browser_tool(url_raw)
+                tool_calls.append({"tool": "open_browser", "args": {"url": url_raw}, "result": result})
+                response = f"Opening {url_raw} in built-in browser, Sir. Navigating to Stark Browser."
+            else:
+                # Check for common sites
+                if "youtube" in lower:
+                    result = _open_browser_tool("https://youtube.com")
+                    tool_calls.append({"tool": "open_browser", "result": result})
+                    response = "Opening YouTube in Stark Browser, Sir."
+                elif "google" in lower:
+                    result = _open_browser_tool("https://google.com")
+                    tool_calls.append({"tool": "open_browser", "result": result})
+                    response = "Opening Google in Stark Browser, Sir."
+                elif "github" in lower:
+                    result = _open_browser_tool("https://github.com")
+                    tool_calls.append({"tool": "open_browser", "result": result})
+                    response = "Opening GitHub in Stark Browser, Sir."
+                else:
+                    # Search in browser
+                    search_q = re.sub(r"open (?:in browser )?(?:website )?", "", user_input, flags=re.I).strip()
+                    result = _open_browser_tool(f"https://duckduckgo.com/?q={search_q.replace(' ', '+')}", search=search_q)
+                    tool_calls.append({"tool": "open_browser", "result": result})
+                    response = f"Searching for '{search_q}' in Stark Browser, Sir."
 
         elif "send to arena" in lower or "message to arena" in lower or "tell arena" in lower:
             msg_match = re.search(r"(?:send to arena|message to arena|tell arena) (.*)", user_input, re.I)
