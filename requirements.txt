@@ -1,0 +1,15 @@
+openai>=1.30.0
+python-dotenv>=1.0.0
+typer>=0.12.0
+rich>=13.7.0
+pydantic>=2.7.0
+httpx>=0.27.0
+beautifulsoup4>=4.12.0
+duckduckgo-search>=6.1.0
+fastapi>=0.110.0
+uvicorn>=0.29.0
+pyyaml>=6.0.1
+termcolor>=2.3.0
+# Optional providers - install if needed
+anthropic>=0.28.0
+google-generativeai>=0.5.0

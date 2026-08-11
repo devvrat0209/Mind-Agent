@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+memory/*.jsonl
+workspace/*
+!workspace/.gitkeep
+!workspace/README.md
+venv/
+.venv/
+.DS_Store
