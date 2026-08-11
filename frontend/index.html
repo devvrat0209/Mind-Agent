@@ -2,19 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>J.A.R.V.I.S. OS 2.0 - Stark Industries</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@300;400;600;700&family=Share+Tech+Mono&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 </head>
-<body>
-    <!-- Background Layers -->
+<body class="no-scroll">
+    <!-- Background -->
     <canvas id="bg-canvas"></canvas>
     <div class="bg-grid"></div>
     <div class="bg-vignette"></div>
-    <div class="bg-noise"></div>
 
-    <!-- Stark Loading Sequence -->
+    <!-- Boot -->
     <div id="boot-screen">
         <div class="boot-content">
             <div class="boot-logo">STARK INDUSTRIES</div>
@@ -23,15 +22,15 @@
         </div>
     </div>
 
-    <!-- Main OS -->
-    <div class="os-container" id="os">
-        <!-- Header Bar - Like Iron Man HUD top -->
+    <!-- Single Tab OS - No Scroll -->
+    <div class="os-container single-viewport" id="os">
+        <!-- Header -->
         <header class="os-header">
             <div class="header-left">
                 <div class="stark-logo">
                     <span class="logo-icon">◉</span>
                     <span class="logo-text">STARK INDUSTRIES</span>
-                    <span class="logo-sub">J.A.R.V.I.S. OS v2.0 • MARK XLII</span>
+                    <span class="logo-sub">J.A.R.V.I.S. OS v2.0 • MARK XLII • SINGLE TAB • NO SCROLL</span>
                 </div>
             </div>
             <div class="header-center">
@@ -45,280 +44,189 @@
             <div class="header-right">
                 <div class="header-stats">
                     <div class="h-stat"><span class="dot online"></span><span id="time-display">--:--:--</span></div>
-                    <div class="h-stat" id="arena-link-status"><span class="dot" id="arena-dot" style="background:#ffaa00"></span> ARENA: SYNCING</div>
-                    <div class="h-stat" id="llm-status">LOCAL MODE</div>
+                    <div class="h-stat" id="arena-link-status"><span class="dot" id="arena-dot" style="background:#00ff88"></span> ARENA: LINKED</div>
+                    <div class="h-stat" id="llm-status">LOCAL</div>
                 </div>
             </div>
         </header>
 
-        <!-- Main Holo Grid -->
-        <div class="holo-grid">
-            <!-- LEFT COLUMN -->
-            <div class="holo-col left-col">
-                <!-- Core Vitals -->
-                <div class="holo-panel vital-panel">
-                    <div class="panel-header">
+        <!-- Main Grid - Single Viewport No Scroll -->
+        <div class="holo-grid no-scroll-grid">
+            <!-- LEFT -->
+            <div class="holo-col left-col no-scroll">
+                <div class="holo-panel vital-panel compact">
+                    <div class="panel-header compact">
                         <span class="p-icon">◈</span>
                         <span class="p-title">CORE VITALS</span>
                         <span class="p-status">● LIVE</span>
                     </div>
-                    <div class="vital-grid">
-                        <div class="vital-item">
-                            <div class="gauge" id="cpu-gauge">
-                                <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" class="gauge-bg"/><circle cx="50" cy="50" r="42" class="gauge-fill" id="cpu-gauge-fill" stroke-dasharray="263" stroke-dashoffset="100"/><text x="50" y="54" class="gauge-text" id="cpu-gauge-text">45%</text></svg>
-                                <span class="gauge-label">CPU</span>
-                            </div>
-                        </div>
-                        <div class="vital-item">
-                            <div class="gauge" id="mem-gauge">
-                                <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" class="gauge-bg"/><circle cx="50" cy="50" r="42" class="gauge-fill mem" id="mem-gauge-fill" stroke-dasharray="263" stroke-dashoffset="80"/><text x="50" y="54" class="gauge-text" id="mem-gauge-text">62%</text></svg>
-                                <span class="gauge-label">MEMORY</span>
-                            </div>
-                        </div>
-                        <div class="vital-item">
-                            <div class="gauge" id="power-gauge">
-                                <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" class="gauge-bg"/><circle cx="50" cy="50" r="42" class="gauge-fill power" id="power-gauge-fill" stroke-dasharray="263" stroke-dashoffset="20"/><text x="50" y="54" class="gauge-text" id="power-gauge-text">98%</text></svg>
-                                <span class="gauge-label">POWER</span>
-                            </div>
-                        </div>
+                    <div class="vital-grid compact">
+                        <div class="vital-item"><div class="gauge small"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" class="gauge-bg"/><circle cx="50" cy="50" r="42" class="gauge-fill" id="cpu-gauge-fill" stroke-dasharray="263" stroke-dashoffset="100"/><text x="50" y="54" class="gauge-text" id="cpu-gauge-text">45%</text></svg><span class="gauge-label">CPU</span></div></div>
+                        <div class="vital-item"><div class="gauge small"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" class="gauge-bg"/><circle cx="50" cy="50" r="42" class="gauge-fill mem" id="mem-gauge-fill" stroke-dasharray="263" stroke-dashoffset="80"/><text x="50" y="54" class="gauge-text" id="mem-gauge-text">62%</text></svg><span class="gauge-label">MEM</span></div></div>
+                        <div class="vital-item"><div class="gauge small"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" class="gauge-bg"/><circle cx="50" cy="50" r="42" class="gauge-fill power" id="power-gauge-fill" stroke-dasharray="263" stroke-dashoffset="20"/><text x="50" y="54" class="gauge-text" id="power-gauge-text">98%</text></svg><span class="gauge-label">PWR</span></div></div>
                     </div>
-                    <div class="vital-bars">
+                    <div class="vital-bars compact">
                         <div class="v-bar-item"><span>NET</span><div class="vb-track"><div class="vb-fill active" style="width:89%"></div></div><span>89ms</span></div>
-                        <div class="v-bar-item"><span>SAT</span><div class="vb-track"><div class="vb-fill" style="width:100%"></div></div><span>7 LINKED</span></div>
-                        <div class="v-bar-item"><span>FIREWALL</span><div class="vb-track"><div class="vb-fill" style="width:92%"></div></div><span>SECURE</span></div>
+                        <div class="v-bar-item"><span>SAT</span><div class="vb-track"><div class="vb-fill" style="width:100%"></div></div><span>7 LINK</span></div>
                     </div>
                 </div>
 
-                <!-- System Logs - Live Streaming -->
-                <div class="holo-panel logs-panel">
-                    <div class="panel-header">
+                <div class="holo-panel logs-panel flex-panel">
+                    <div class="panel-header compact">
                         <span class="p-icon">≡</span>
-                        <span class="p-title">SYSTEM LOGS</span>
+                        <span class="p-title">SYSTEM LOGS • LIVE</span>
                         <span class="p-actions">
-                            <button class="p-btn" id="clear-logs-btn" title="Clear">✕</button>
-                            <button class="p-btn" id="pause-logs-btn" title="Pause">❚❚</button>
+                            <button class="p-btn" id="clear-logs-btn">✕</button>
+                            <button class="p-btn" id="pause-logs-btn">❚❚</button>
                         </span>
                     </div>
-                    <div class="logs-stream" id="logs-stream">
-                        <!-- logs injected -->
-                    </div>
+                    <div class="logs-stream compact-logs" id="logs-stream"></div>
                 </div>
 
-                <!-- Memory & Arena -->
-                <div class="holo-panel memory-panel">
-                    <div class="panel-header">
+                <div class="holo-panel memory-panel compact-panel">
+                    <div class="panel-header compact">
                         <span class="p-icon">⬢</span>
-                        <span class="p-title">MEMORY BANKS</span>
-                        <span class="p-status" id="arena-msg-count">0 MSGS</span>
+                        <span class="p-title">MEMORY • ARENA</span>
+                        <span class="p-status" id="arena-msg-count">0</span>
                     </div>
-                    <div class="panel-tabs">
+                    <div class="panel-tabs compact-tabs">
                         <button class="tab active" data-tab="memories">MEM</button>
-                        <button class="tab" data-tab="arena">ARENA LINK</button>
-                        <button class="tab" data-tab="reminders">TASKS</button>
+                        <button class="tab" data-tab="arena">ARENA</button>
+                        <button class="tab" data-tab="reminders">TASK</button>
                     </div>
-                    <div class="tab-content active" id="tab-memories">
-                        <div id="memory-list" class="mem-list"><div class="empty">Scanning memory cores...</div></div>
-                    </div>
-                    <div class="tab-content" id="tab-arena">
-                        <div id="arena-conversation" class="mem-list"><div class="empty">Workshop link standby</div></div>
-                    </div>
-                    <div class="tab-content" id="tab-reminders">
-                        <div id="reminder-list" class="mem-list"><div class="empty">No tasks, Sir</div></div>
-                    </div>
-                </div>
-
-                <!-- Active Modules -->
-                <div class="holo-panel modules-panel">
-                    <div class="panel-header">
-                        <span class="p-icon">◫</span>
-                        <span class="p-title">ACTIVE MODULES</span>
-                    </div>
-                    <div class="module-grid">
-                        <div class="module active"><span class="m-dot"></span>Voice Matrix</div>
-                        <div class="module active"><span class="m-dot"></span>Vision Core</div>
-                        <div class="module active"><span class="m-dot"></span>Neural Net</div>
-                        <div class="module active"><span class="m-dot"></span>Browser</div>
-                        <div class="module active"><span class="m-dot"></span>Search Intel</div>
-                        <div class="module active"><span class="m-dot"></span>File System</div>
-                    </div>
+                    <div class="tab-content active" id="tab-memories"><div id="memory-list" class="mem-list compact-mem"><div class="empty">Scanning cores...</div></div></div>
+                    <div class="tab-content" id="tab-arena"><div id="arena-conversation" class="mem-list compact-mem"><div class="empty">Workshop standby</div></div></div>
+                    <div class="tab-content" id="tab-reminders"><div id="reminder-list" class="mem-list compact-mem"><div class="empty">All clear</div></div></div>
                 </div>
             </div>
 
-            <!-- CENTER COLUMN - Reactor + Chat -->
-            <div class="holo-col center-col">
-                <!-- Reactor Core - The Heart -->
-                <div class="reactor-chamber">
+            <!-- CENTER - Reactor + Chat -->
+            <div class="holo-col center-col no-scroll">
+                <div class="reactor-chamber compact-reactor">
                     <canvas id="core-canvas"></canvas>
                     <canvas id="globe-canvas"></canvas>
-                    <div class="reactor-core">
+                    <div class="reactor-core small-core">
                         <div class="reactor-ring r1"></div>
                         <div class="reactor-ring r2"></div>
                         <div class="reactor-ring r3"></div>
-                        <div class="reactor-ring r4"></div>
                         <div class="reactor-circle">
-                            <div class="reactor-inner">
-                                <div class="tri-ring"></div>
-                                <div class="core-glow"></div>
-                                <span class="core-letter">J</span>
-                            </div>
+                            <div class="reactor-inner"><div class="tri-ring"></div><div class="core-glow"></div><span class="core-letter">J</span></div>
                             <div class="core-scanner"></div>
                         </div>
-                        <!-- Orbiting data -->
                         <div class="orbit orbit1"><span class="orbit-dot"></span></div>
                         <div class="orbit orbit2"><span class="orbit-dot"></span></div>
-                        <div class="orbit orbit3"><span class="orbit-dot"></span></div>
                     </div>
-                    <div class="reactor-data">
-                        <div class="rd-item"><span class="rd-label">ARC OUTPUT</span><span class="rd-value" id="arc-output">102.3%</span></div>
-                        <div class="rd-item"><span class="rd-label">CORE TEMP</span><span class="rd-value">3420K</span></div>
+                    <div class="reactor-data compact-data">
+                        <div class="rd-item"><span class="rd-label">ARC</span><span class="rd-value" id="arc-output">102%</span></div>
+                        <div class="rd-item"><span class="rd-label">TEMP</span><span class="rd-value">3420K</span></div>
                         <div class="rd-item"><span class="rd-label">STATUS</span><span class="rd-value online">NOMINAL</span></div>
                     </div>
-                    <div class="voice-visualizer" id="visualizer"></div>
+                    <div class="voice-visualizer compact-vis" id="visualizer"></div>
                 </div>
 
-                <!-- State Indicator -->
-                <div class="state-indicator" id="state-indicator">
+                <div class="state-indicator compact-state" id="state-indicator">
                     <span class="state-dot" id="state-dot"></span>
-                    <span id="state-text">IDLE • Listening for "Jarvis" • Stark OS Ready</span>
-                    <span class="state-extra" id="mode-display">LOCAL MODE</span>
+                    <span id="state-text">IDLE • Stark OS Ready • Single Tab • No Scroll</span>
+                    <span class="state-extra" id="mode-display">LOCAL</span>
                 </div>
 
-                <!-- Chat Interface - Transparent Holo -->
-                <div class="chat-holo">
-                    <div class="chat-stream" id="chat-container">
-                        <!-- messages -->
-                    </div>
-                    <div class="chat-input-area">
+                <div class="chat-holo flex-chat">
+                    <div class="chat-stream compact-chat" id="chat-container"></div>
+                    <div class="chat-input-area compact-input">
                         <div class="input-holo">
                             <span class="input-prompt">›</span>
-                            <input type="text" id="user-input" placeholder="Command J.A.R.V.I.S... (e.g., 'Open youtube', 'System status', 'Search AI news', 'Remember my suit is Mark 42')" autocomplete="off">
+                            <input type="text" id="user-input" placeholder="Command JARVIS... e.g., Open youtube, Status, Search AI news" autocomplete="off">
                             <button id="send-btn" class="holo-send">SEND</button>
                         </div>
-                        <div class="holo-controls">
-                            <button id="mic-btn" class="holo-ctrl"><span class="c-icon">🎙</span><span>MIC OFF</span></button>
-                            <button id="voice-btn" class="holo-ctrl active"><span class="c-icon">🔊</span><span>VOICE ON</span></button>
-                            <button id="wake-btn" class="holo-ctrl wake active"><span class="c-icon">⚡</span><span>WAKE WORD ON</span></button>
-                            <button id="clear-btn" class="holo-ctrl"><span class="c-icon">⌫</span><span>CLEAR</span></button>
+                        <div class="holo-controls compact-controls">
+                            <button id="mic-btn" class="holo-ctrl"><span>🎙</span><span>MIC OFF</span></button>
+                            <button id="voice-btn" class="holo-ctrl active"><span>🔊</span><span>VOICE</span></button>
+                            <button id="wake-btn" class="holo-ctrl wake active"><span>⚡</span><span>WAKE</span></button>
+                            <button id="clear-btn" class="holo-ctrl"><span>⌫</span><span>CLR</span></button>
                         </div>
-                        <div class="suggestions" id="suggestions">
-                            <span class="sug" data-cmd="Open youtube.com">📺 YOUTUBE</span>
-                            <span class="sug" data-cmd="Open google.com">🌐 GOOGLE</span>
-                            <span class="sug" data-cmd="What's the weather?">⛅ WEATHER</span>
-                            <span class="sug" data-cmd="System status report">💻 STATUS</span>
-                            <span class="sug" data-cmd="Search for latest Iron Man news">🔎 SEARCH</span>
-                            <span class="sug" data-cmd="List files">📁 FILES</span>
-                            <span class="sug" data-cmd="Arena link status">🔗 ARENA LINK</span>
-                            <span class="sug" data-cmd="Calculate 245 * 18">🧮 CALC</span>
+                        <div class="suggestions compact-sugs" id="suggestions">
+                            <span class="sug" data-cmd="Open youtube.com">YT</span>
+                            <span class="sug" data-cmd="Open google.com">GG</span>
+                            <span class="sug" data-cmd="What's the weather?">WX</span>
+                            <span class="sug" data-cmd="System status report">SYS</span>
+                            <span class="sug" data-cmd="Search AI news">SRCH</span>
+                            <span class="sug" data-cmd="Arena link status">LINK</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- RIGHT COLUMN - Browser + Intel -->
-            <div class="holo-col right-col">
-                <!-- STARK BROWSER - Built-in -->
-                <div class="holo-panel browser-panel">
-                    <div class="panel-header browser-header-ui">
+            <!-- RIGHT - Single Tab Browser Only -->
+            <div class="holo-col right-col no-scroll">
+                <!-- SINGLE TAB BROWSER -->
+                <div class="holo-panel browser-panel single-tab-browser flex-browser">
+                    <div class="panel-header compact browser-header-ui">
                         <span class="p-icon">◨</span>
-                        <span class="p-title">STARK BROWSER • BUILT-IN</span>
+                        <span class="p-title">STARK BROWSER • SINGLE TAB • BUILT-IN</span>
                         <span class="p-status" id="browser-status">READY</span>
                     </div>
-                    <div class="browser-toolbar">
+                    <div class="browser-toolbar compact-toolbar">
                         <div class="bt-group">
-                            <button class="bt-btn" id="browser-back" title="Back">‹</button>
-                            <button class="bt-btn" id="browser-forward" title="Forward">›</button>
-                            <button class="bt-btn" id="browser-reload" title="Reload">↻</button>
-                            <button class="bt-btn" id="browser-home" title="Home">⌂</button>
+                            <button class="bt-btn" id="browser-back">‹</button>
+                            <button class="bt-btn" id="browser-forward">›</button>
+                            <button class="bt-btn" id="browser-reload">↻</button>
+                            <button class="bt-btn" id="browser-home">⌂</button>
                         </div>
                         <div class="bt-url-wrap">
                             <span class="bt-secure">🔒</span>
-                            <input type="text" id="browser-url" placeholder="Enter URL or search... (e.g., github.com, youtube.com)" value="https://duckduckgo.com">
+                            <input type="text" id="browser-url" placeholder="URL or search - single tab, no scroll page" value="https://duckduckgo.com">
                             <button class="bt-go" id="browser-go">GO</button>
                         </div>
                         <div class="bt-group">
-                            <button class="bt-btn" id="browser-proxy-toggle" title="Proxy Mode">🛰 PROXY</button>
-                            <button class="bt-btn" id="browser-popout" title="Popout">⧉</button>
+                            <button class="bt-btn" id="browser-proxy-toggle">🛰</button>
+                            <button class="bt-btn" id="browser-popout">⧉</button>
                         </div>
                     </div>
-                    <div class="browser-tabs">
-                        <div class="b-tab active" data-url="https://duckduckgo.com">DUCK • SEARCH</div>
-                        <div class="b-tab" data-url="https://google.com">GOOGLE</div>
-                        <div class="b-tab" data-url="https://github.com">GITHUB</div>
-                        <button class="b-tab-new" id="new-tab">+ TAB</button>
-                    </div>
-                    <div class="browser-viewport" id="browser-viewport">
+                    <!-- NO TABS - Single Tab Only as Requested -->
+                    <div class="browser-viewport single-viewport-browser" id="browser-viewport">
                         <iframe id="browser-frame" src="https://duckduckgo.com" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-downloads" allow="fullscreen"></iframe>
                         <div id="browser-proxy-view" class="proxy-view hidden"></div>
-                        <div id="browser-loading" class="browser-loading hidden">
-                            <div class="b-loader"></div>
-                            <span>LOADING • ESTABLISHING SECURE LINK...</span>
-                        </div>
+                        <div id="browser-loading" class="browser-loading hidden"><div class="b-loader"></div><span>LOADING...</span></div>
                     </div>
-                    <div class="browser-footer">
-                        <span id="browser-info">Stark Secure Browser • Proxy bypass enabled for X-Frame blocked sites • Jarvik can open any URL via "Open youtube.com"</span>
+                    <div class="browser-footer compact-footer">
+                        <span>Single Tab • No Page Scroll • All in One Viewport • Stark Secure</span>
                     </div>
                 </div>
 
-                <!-- Intel Feed / Search Results -->
-                <div class="holo-panel intel-panel">
-                    <div class="panel-header">
+                <!-- Intel + Tools in Tabs but No Scroll Page -->
+                <div class="holo-panel intel-panel compact-intel flex-intel">
+                    <div class="panel-header compact">
                         <span class="p-icon">◧</span>
-                        <span class="p-title">INTEL FEED • WEB SEARCH</span>
-                        <span class="p-status" id="intel-count">0 RESULTS</span>
+                        <span class="p-title">INTEL • TOOLS • LOGS</span>
+                        <span class="p-status" id="intel-count">0</span>
                     </div>
-                    <div class="intel-search">
-                        <input type="text" id="intel-search-input" placeholder="Search web (Jarvis will also search automatically)...">
-                        <button id="intel-search-btn">SEARCH</button>
-                    </div>
-                    <div class="intel-results" id="intel-results">
-                        <div class="empty-intel">Awaiting search query, Sir.<br><small>Try "Search for Iron Man suit specs" or "Search for SpaceX"</small></div>
-                    </div>
-                </div>
-
-                <!-- Tool Log & File Explorer -->
-                <div class="holo-panel dual-panel">
-                    <div class="dual-tabs">
-                        <button class="dual-tab active" data-dual="tools">TOOL LOG</button>
+                    <div class="dual-tabs compact-tabs">
+                        <button class="dual-tab active" data-dual="intel">INTEL</button>
+                        <button class="dual-tab" data-dual="tools">TOOLS</button>
                         <button class="dual-tab" data-dual="files">FILES</button>
-                        <button class="dual-tab" data-dual="terminal">TERMINAL</button>
+                        <button class="dual-tab" data-dual="terminal">TERM</button>
                     </div>
-                    <div class="dual-content active" id="dual-tools">
-                        <div id="tool-log" class="tool-log">
-                            <div class="log-empty">Awaiting commands, Sir</div>
+                    <div class="dual-content active" id="dual-intel">
+                        <div class="intel-search compact-search">
+                            <input type="text" id="intel-search-input" placeholder="Search web...">
+                            <button id="intel-search-btn">GO</button>
                         </div>
+                        <div class="intel-results compact-results" id="intel-results"><div class="empty-intel">Awaiting query<br><small>Search opens in browser same tab</small></div></div>
                     </div>
+                    <div class="dual-content" id="dual-tools"><div id="tool-log" class="tool-log compact-log"><div class="log-empty">Awaiting cmds</div></div></div>
                     <div class="dual-content" id="dual-files">
-                        <div class="file-toolbar">
-                            <input type="text" id="file-path-input" value="." placeholder="Path">
-                            <button id="file-list-btn">LS</button>
-                        </div>
-                        <div id="file-explorer" class="file-explorer"><div class="empty">Click LS to list files</div></div>
+                        <div class="file-toolbar compact-toolbar"><input type="text" id="file-path-input" value="."><button id="file-list-btn">LS</button></div>
+                        <div id="file-explorer" class="file-explorer compact-explorer"><div class="empty">LS to list</div></div>
                     </div>
-                    <div class="dual-content" id="dual-terminal">
-                        <div id="terminal-output" class="terminal-output">STARK OS Terminal v2.0<br>Type 'help' or use Jarvis tools<br>› </div>
-                        <div class="terminal-input-wrap">
-                            <span>›</span><input type="text" id="terminal-input" placeholder="Enter command...">
-                        </div>
-                    </div>
+                    <div class="dual-content" id="dual-terminal"><div id="terminal-output" class="terminal-output compact-term">STARK OS v2.1 Single Tab<br>› </div><div class="terminal-input-wrap"><span>›</span><input type="text" id="terminal-input" placeholder="cmd..."></div></div>
                 </div>
             </div>
         </div>
 
-        <!-- Footer Stats -->
-        <footer class="os-footer">
-            <div class="footer-left">
-                <span>STARK INDUSTRIES © 2026</span>
-                <span class="sep">•</span>
-                <span id="arena-footer">ARENA LINK: SYNCING...</span>
-            </div>
-            <div class="footer-center">
-                <span class="foot-stat">UPTIME: <span id="uptime">00:00:00</span></span>
-                <span class="foot-stat">QUERIES: <span id="query-count">0</span></span>
-                <span class="foot-stat">MEM: <span id="footer-mem">62%</span></span>
-            </div>
-            <div class="footer-right">
-                <span>J.A.R.V.I.S. OS • MARK XLII • REAL HUD MODE • BUILT-IN BROWSER • LIVE LOGS</span>
-            </div>
+        <footer class="os-footer compact-footer-bar">
+            <div class="footer-left"><span>STARK ©2026 • SINGLE TAB • NO SCROLL • ALL IN ONE VIEWPORT</span><span class="sep">•</span><span id="arena-footer">ARENA: LINKED</span></div>
+            <div class="footer-center"><span class="foot-stat">UP:<span id="uptime">00:00</span></span><span class="foot-stat">Q:<span id="query-count">0</span></span><span class="foot-stat">MEM:<span id="footer-mem">62%</span></span></div>
+            <div class="footer-right"><span>J.A.R.V.I.S. MARK XLII • REAL HUD • BROWSER • LOGS • ONE TAB</span></div>
         </footer>
     </div>
 

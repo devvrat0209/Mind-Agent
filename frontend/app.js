@@ -361,8 +361,10 @@ browserForward.addEventListener('click', ()=>{ if(historyIndex<browserHistory.le
 browserReload.addEventListener('click', ()=> openBrowser(currentBrowserUrl));
 browserHome.addEventListener('click', ()=> openBrowser('https://duckduckgo.com'));
 proxyToggle.addEventListener('click', ()=>{ useProxy=!useProxy; proxyToggle.style.color=useProxy?'#00ff88':'#6a8aaa'; proxyToggle.textContent=useProxy?'🛰 PROXY ON':'🛰 PROXY'; openBrowser(currentBrowserUrl, {proxy:useProxy}); if(useProxy) addLog('Proxy mode enabled - bypassing X-Frame-Options', 'SYS', 'BROWSER'); });
-document.getElementById('browser-popout').addEventListener('click', ()=> window.open(currentBrowserUrl, '_blank'));
-document.getElementById('new-tab').addEventListener('click', ()=> openBrowser('https://duckduckgo.com'));
+const popoutBtn = document.getElementById('browser-popout');
+if(popoutBtn) popoutBtn.addEventListener('click', ()=> window.open(currentBrowserUrl, '_blank'));
+const newTabBtn = document.getElementById('new-tab');
+if(newTabBtn) newTabBtn.addEventListener('click', ()=> openBrowser('https://duckduckgo.com'));
 document.querySelectorAll('.b-tab').forEach(tab=>{
   tab.addEventListener('click', ()=>{ document.querySelectorAll('.b-tab').forEach(t=>t.classList.remove('active')); tab.classList.add('active'); openBrowser(tab.dataset.url); });
 });
