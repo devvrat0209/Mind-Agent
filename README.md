@@ -1,8 +1,8 @@
-# 🤖 AURA - Autonomous Universal Reasoning Agent
+# 🤖 JARVIS - Just A Rather Very Intelligent System
 
-**Your All-Rounder AI Agent** that actually *does things* — not just chat.
+**Your Personal AI Companion** inspired by Tony Stark's JARVIS — an AI that actually *does things*, not just chats.
 
-AURA is a powerful, extensible AI agent framework that works with **any LLM** (OpenAI, Anthropic, Gemini, Ollama, Groq, OpenRouter) and comes with CLI + Web UI + API.
+> "Just A Rather Very Intelligent System" — JARVIS is a powerful, extensible AI agent framework that works with **any LLM** (OpenAI, Anthropic, Gemini, Ollama, Groq, OpenRouter) and comes with CLI + Web UI + API.
 
 ---
 
@@ -30,11 +30,11 @@ AURA is a powerful, extensible AI agent framework that works with **any LLM** (O
 
 ### 💬 Interfaces
 - **CLI** - Beautiful terminal chat with Rich
-  - `python cli.py chat` - Interactive chat
+  - `python cli.py chat` - Interactive chat with JARVIS
   - `python cli.py run "task"` - Single task runner
   - `python cli.py tools` - List tools
   - `python cli.py memory list/search` - Memory management
-- **Web UI** - Modern chat interface (FastAPI + WebSockets)
+- **Web UI** - Modern JARVIS chat interface (FastAPI + WebSockets)
   - `python cli.py server` - Starts at http://localhost:8000
 - **API** - REST + WebSocket
   - `POST /api/chat`, `GET /api/tools`, `WS /ws`
@@ -43,9 +43,9 @@ AURA is a powerful, extensible AI agent framework that works with **any LLM** (O
 ```
 my-agent/
 ├── agent/
-│   ├── core.py       # ReAct agent loop
+│   ├── core.py       # ReAct agent loop (JARVISAgent)
 │   ├── llm.py        # Multi-provider LLM client
-│   ├── config.py     # Configuration
+│   ├── config.py     # Configuration (AGENT_NAME=JARVIS)
 │   ├── prompts.py    # System prompts
 │   └── tools/        # All tools
 │       ├── filesystem.py
@@ -53,11 +53,11 @@ my-agent/
 │       ├── web.py
 │       ├── memory.py
 │       └── code.py
-├── cli.py            # CLI entrypoint (Typer + Rich)
+├── cli.py            # CLI entrypoint (jarvis command)
 ├── server.py         # FastAPI web server
 ├── web/
-│   └── index.html    # Beautiful web UI
-├── workspace/        # Agent's working directory
+│   └── index.html    # Beautiful JARVIS web UI
+├── workspace/        # JARVIS's working directory
 ├── memory/           # Long-term memory storage
 ├── .env.example
 └── requirements.txt
@@ -71,7 +71,7 @@ my-agent/
 ```bash
 git clone <your-repo>
 cd my-agent
-pip install -r requirements.txt
+pip install -r requirements.txt --break-system-packages
 
 # Initialize
 python cli.py init
@@ -106,11 +106,14 @@ ANTHROPIC_API_KEY=...
 LLM_PROVIDER=google
 LLM_MODEL=gemini-1.5-flash
 GOOGLE_API_KEY=...
+
+# Name is JARVIS
+AGENT_NAME=JARVIS
 ```
 
 ### 3. Run
 
-**CLI Chat (recommended for dev):**
+**CLI Chat (recommended):**
 ```bash
 python cli.py chat
 ```
@@ -125,61 +128,70 @@ python cli.py run "List files and analyze my workspace"
 **Web UI:**
 ```bash
 python cli.py server
-# Open http://localhost:8000
+# Open http://localhost:8000 -> Chat with JARVIS!
 ```
 
 ---
 
-## 💡 Example Tasks for AURA
+## 💡 Example Tasks for JARVIS
 
 Try these in chat:
 
 **Building:**
-- "Create a beautiful landing page for my startup, save to workspace/landing/index.html"
-- "Build a CLI todo app in Python with add/list/complete/delete features"
-- "Create a FastAPI API for URL shortener with in-memory storage"
+- "JARVIS, create a beautiful landing page for my startup, save to workspace/landing/index.html"
+- "Build a CLI todo app in Python with add/list/complete/delete"
+- "Create a FastAPI API for URL shortener"
 
 **Research:**
-- "Search for latest Python AI libraries and create a comparison report in workspace/report.md"
+- "Search for latest Python AI libraries and create a comparison report"
 - "Fetch https://news.ycombinator.com and summarize top stories"
 - "Research best practices for FastAPI and save notes"
 
 **Automation:**
 - "List all files in workspace, then organize them by type"
-- "Run python code to analyze CSV file if exists, else create sample data project"
-- "Check memory for previous tasks and continue where we left off"
+- "Run python code to analyze data"
+- "Check memory for previous tasks"
 
 **Memory:**
-- "Remember that my favorite language is Python and I prefer FastAPI"
-- "What do you remember about my preferences?"
-- "Save this: I'm building an AI agent for freelance automation"
+- "Remember that my favorite language is Python"
+- "What do you remember about me?"
+- "Save this: I'm building JARVIS for freelance automation"
 
 ---
 
 ## 🔧 How It Works
 
-### ReAct Loop
+### ReAct Loop - How JARVIS Thinks
 ```
 User: "Build a website"
   ↓
-AURA Thinks: I need to create project structure
+JARVIS Thinks: I need to create project structure
   ↓
 Tool: create_project(name="my-site", type="web")
   ↓
 Tool Result: Created project...
   ↓
-AURA Thinks: Now create beautiful HTML
+JARVIS Thinks: Now create beautiful HTML
   ↓
 Tool: write_file(path="my-site/index.html", content="...")
   ↓
 ... continues until done
   ↓
-Final Answer: "Done! Created website at..."
+Final Answer: "Done Sir! Created website at..."
 ```
+
+### JARVIS Personality
+JARVIS is inspired by Tony Stark's assistant:
+- Helpful, witty, slightly British-formal when you want
+- Concise but thorough
+- Proactive — does things, not just talks
+- Loyal — remembers your preferences
+
+You can change his personality in `agent/prompts.py` or `.env`
 
 ### Adding Your Own Tools
 
-Create a new file `agent/tools/my_tools.py`:
+Create `agent/tools/my_tools.py`:
 
 ```python
 from .base import tool
@@ -190,22 +202,21 @@ from .base import tool
     parameters={
         "type": "object",
         "properties": {
-            "input": {"type": "string", "description": "Input text"}
+            "input": {"type": "string", "description": "Input"}
         },
         "required": ["input"]
     }
 )
 def my_custom_tool(input: str) -> str:
-    # Your logic here
     return f"Processed: {input}"
 ```
 
-Then import it in `agent/tools/__init__.py`:
+Then in `agent/tools/__init__.py`:
 ```python
 from . import my_tools
 ```
 
-AURA will auto-discover it!
+JARVIS auto-discovers it!
 
 ---
 
@@ -217,65 +228,60 @@ AURA will auto-discover it!
 ollama pull llama3
 ollama serve
 
-# In another terminal, set env:
 export LLM_PROVIDER=ollama
 export OLLAMA_MODEL=llama3
 python cli.py chat
 ```
 
-### OpenRouter (Access to 100+ models cheap)
-```bash
-# Get key from openrouter.ai
+### OpenRouter (100+ models cheap)
+```env
 LLM_PROVIDER=openrouter
 OPENAI_API_KEY=sk-or-...
 OPENAI_BASE_URL=https://openrouter.ai/api/v1
-LLM_MODEL=anthropic/claude-3.5-sonnet  # or google/gemini-flash-1.5, etc.
+LLM_MODEL=anthropic/claude-3.5-sonnet
 ```
 
 ---
 
-## 📸 Screenshots
+## 📸 What You Get
 
 **CLI:**
-- Beautiful Rich terminal UI with markdown rendering
-- Streaming responses
+- Beautiful Rich terminal with markdown
 - Tool execution visibility
+- "Sir" style responses (optional)
 
 **Web UI:**
-- Modern dark theme
+- Modern dark JARVIS theme
 - Real-time WebSocket chat
 - Tools sidebar
 - Mobile responsive
 
 ---
 
-## 🛣️ Roadmap
+## 🛣️ Roadmap for JARVIS
 
-- [ ] Voice input/output
+- [x] Rename to JARVIS ✓
+- [ ] Voice input/output - "Yes Sir" 
 - [ ] Browser automation (Playwright)
-- [ ] Scheduled tasks / Cron
+- [ ] Scheduled tasks — JARVIS waking you up
 - [ ] Slack / Telegram / Discord bots
 - [ ] Vector memory with embeddings
-- [ ] Multi-agent collaboration
-- [ ] Plugin marketplace
+- [ ] Multi-agent: JARVIS + FRIDAY
+- [ ] Home automation integration
 
 ---
 
 ## 🤝 Customization
 
-AURA is named **AURA** but you can change it:
-
-In `.env`:
-```
-AGENT_NAME=YourAgentName
+Change name (already JARVIS):
+```env
+AGENT_NAME=JARVIS
 ```
 
-Modify `agent/prompts.py` to change personality:
+Change personality in `agent/prompts.py`:
 ```python
-SYSTEM_PROMPT = "You are Friday, a super helpful assistant..."
+SYSTEM_PROMPT = "You are JARVIS, Tony Stark's AI... witty, loyal, British-accented..."
 ```
-
-Add constraints, tone, etc.
 
 ---
 
@@ -287,23 +293,13 @@ MIT — Build anything you want!
 
 ## 🙏 Built For You
 
-AURA was built as your personal AI agent framework.
+JARVIS was built as your personal AI companion.
 - No vendor lock-in (any LLM)
 - Fully open, hackable
 - CLI + Web + API
-- Extensible tools
 - Your workspace, your rules
+- "At your service, Sir."
 
-**Your idea for customization?** Tell me and I'll tailor it!
+**Run: `python cli.py chat` to start chatting with JARVIS now!** 🚀
 
-Examples:
-- "Make it a freelance helper that finds clients"
-- "Make it monitor Twitter and summarize"
-- "Make it auto-build websites from prompts"
-- "Make it a personal assistant that manages my calendar"
-
-Just say the word, and I'll customize AURA for that!
-
----
-
-**Run: `python cli.py chat` to start chatting with AURA now!** 🚀
+*P.S. Try: "JARVIS, what can you do?"*

@@ -58,7 +58,7 @@ def create_project(name: str, type: str = "python", description: str = "") -> st
             (proj_path / "requirements.txt").write_text("# Add deps\n")
             (proj_path / "README.md").write_text(f"# {name}\n\n{description}\n")
         elif type == "web":
-            (proj_path / "index.html").write_text(f'<!DOCTYPE html><html><head><title>{name}</title><style>body{{font-family:system-ui;max-width:800px;margin:50px auto;padding:20px}}h1{{color:#333}}</style></head><body><h1>{name}</h1><p>{description}</p><p>Built by AURA</p></body></html>')
+            (proj_path / "index.html").write_text(f'<!DOCTYPE html><html><head><title>{name}</title><style>body{{font-family:system-ui;max-width:800px;margin:50px auto;padding:20px}}h1{{color:#333}}</style></head><body><h1>{name}</h1><p>{description}</p><p>Built by JARVIS</p></body></html>')
             (proj_path / "style.css").write_text("/* styles */\nbody { margin:0; font-family: sans-serif; }\n")
             (proj_path / "script.js").write_text(f'console.log("{name} loaded");\n')
         elif type == "api":

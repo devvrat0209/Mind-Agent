@@ -1,5 +1,5 @@
 """
-AURA Web Server - FastAPI + WebSocket chat
+JARVIS Web Server - FastAPI + WebSocket chat
 Provides both API and beautiful web UI
 """
 
@@ -17,21 +17,21 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent))
 
 from agent.config import AgentConfig
-from agent.core import AURAAgent
+from agent.core import JARVISAgent
 
 app = FastAPI(
-    title="AURA Agent API",
-    description="Autonomous Universal Reasoning Agent - API & Web UI",
-    version="0.1.0"
+    title="JARVIS Agent API",
+    description="Just A Rather Very Intelligent System - API & Web UI",
+    version="0.2.0"
 )
 
 # Store agents per session (simple in-memory)
-agents: Dict[str, AURAAgent] = {}
+agents: Dict[str, JARVISAgent] = {}
 
-def get_agent(session_id: str = "default") -> AURAAgent:
+def get_agent(session_id: str = "default") -> JARVISAgent:
     if session_id not in agents:
         config = AgentConfig()
-        agents[session_id] = AURAAgent(config)
+        agents[session_id] = JARVISAgent(config)
     return agents[session_id]
 
 class ChatRequest(BaseModel):
@@ -55,7 +55,7 @@ async def web_ui():
 <!DOCTYPE html>
 <html>
 <head>
-    <title>AURA - AI Agent</title>
+    <title>JARVIS - AI Agent</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -84,18 +84,18 @@ async def web_ui():
 </head>
 <body>
     <div class="header">
-        <h1>🤖 AURA</h1>
-        <p>Autonomous Universal Reasoning Agent — Your All-Rounder AI</p>
+        <h1>🤖 JARVIS</h1>
+        <p>Just A Rather Very Intelligent System — Your All-Rounder AI</p>
     </div>
     <div class="chat" id="chat">
         <div class="msg assistant">
             <div class="avatar">A</div>
-            <div class="bubble">👋 Hi! I'm <b>AURA</b>, your autonomous AI agent.<br><br>I can:<br>• 🌐 Search the web & fetch pages<br>• 📁 Read/write files & manage your workspace<br>• 💻 Run shell commands & Python code<br>• 🧠 Remember things long-term<br>• 🛠️ Create projects & automate tasks<br><br>What should we build today?</div>
+            <div class="bubble">👋 Hi! I'm <b>JARVIS</b>, your autonomous AI agent.<br><br>I can:<br>• 🌐 Search the web & fetch pages<br>• 📁 Read/write files & manage your workspace<br>• 💻 Run shell commands & Python code<br>• 🧠 Remember things long-term<br>• 🛠️ Create projects & automate tasks<br><br>What should we build today?</div>
         </div>
     </div>
     <div class="tools-info" id="status"></div>
     <div class="input-area">
-        <input type="text" id="input" placeholder="Ask AURA to do something..." autofocus>
+        <input type="text" id="input" placeholder="Ask JARVIS to do something..." autofocus>
         <button onclick="send()">Send</button>
     </div>
 <script>
@@ -163,7 +163,7 @@ async function send() {
     if (!msg) return;
     addMsg('user', msg);
     input.value = '';
-    statusEl.textContent = '🤖 AURA is thinking...';
+    statusEl.textContent = '🤖 JARVIS is thinking...';
     
     if (ws && ws.readyState === 1) {
         ws.send(JSON.stringify({message: msg}));
@@ -236,7 +236,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = "default"):
             if not user_msg.strip():
                 continue
             
-            await websocket.send_json({"type": "status", "text": f"🤖 AURA thinking (step 1/{agent.config.max_steps})..."})
+            await websocket.send_json({"type": "status", "text": f"🤖 JARVIS thinking (step 1/{agent.config.max_steps})..."})
             
             # For streaming, we need to capture
             # Since our LLM may not stream tool calls perfectly, we simulate
@@ -265,7 +265,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = "default"):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "agent": "AURA", "version": "0.1.0"}
+    return {"status": "ok", "agent": "JARVIS", "version": "0.2.0"}
 
 if __name__ == "__main__":
     import uvicorn

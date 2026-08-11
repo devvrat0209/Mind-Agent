@@ -165,7 +165,7 @@ class MockLLMClient:
             if m["role"] == "user":
                 last_user = m["content"]
                 break
-        return f"[MOCK MODE - No API key set] You said: {last_user}\n\nI am AURA, your AI agent. To enable full capabilities, set OPENAI_API_KEY in .env\n\nAvailable tools: {[t['function']['name'] for t in (tools or [])][:5]}"
+        return f"[MOCK MODE - No API key set] You said: {last_user}\n\nI am JARVIS, your AI agent. To enable full capabilities, set OPENAI_API_KEY in .env\n\nAvailable tools: {[t['function']['name'] for t in (tools or [])][:5]}"
     
     def chat_stream(self, messages, tools=None):
         text = self.chat(messages, tools)

@@ -1,3 +1,2 @@
-# Welcome to AURA's workspace
-This is where your agent works.
-
+# Welcome to JARVIS workspace
+This is where JARVIS works for you. Ask JARVIS to build anything here.

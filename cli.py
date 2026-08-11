@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-AURA CLI - Your AI Agent in Terminal
+JARVIS CLI - Your AI Agent in Terminal
+Just A Rather Very Intelligent System
 Usage:
   python cli.py chat                    # Interactive chat
   python cli.py run "your task"         # Run a task
@@ -22,36 +23,35 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Add current dir to path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from agent.config import AgentConfig
-from agent.core import AURAAgent
+from agent.core import JARVISAgent
 
 app = typer.Typer(
-    name="aura",
-    help="AURA - Autonomous Universal Reasoning Agent 🤖",
+    name="jarvis",
+    help="JARVIS - Just A Rather Very Intelligent System 🤖",
     add_completion=False
 )
 console = Console()
 
-def get_agent() -> AURAAgent:
+def get_agent() -> JARVISAgent:
     config = AgentConfig()
-    return AURAAgent(config)
+    return JARVISAgent(config)
 
 @app.command(name="chat")
 def chat_cmd():
-    """Start interactive chat with AURA"""
+    """Start interactive chat with JARVIS"""
     agent = get_agent()
     
     console.print(Panel.fit(
-        f"[bold cyan]🤖 AURA - {agent.config.agent_name}[/bold cyan]\n"
+        f"[bold cyan]🤖 JARVIS - {agent.config.agent_name}[/bold cyan]\n"
         f"[dim]{agent.config.agent_description}[/dim]\n\n"
         f"Model: {agent.config.llm_provider}/{agent.config.llm_model}\n"
         f"Workspace: {agent.config.workspace_dir}\n"
         f"Tools: {len(agent.registry.tools)} available\n\n"
         f"Type [bold]exit[/bold] or [bold]quit[/bold] to leave, [bold]clear[/bold] to clear history, [bold]tools[/bold] to list tools",
-        title="Welcome to AURA",
+        title=f"Welcome to {agent.config.agent_name}",
         border_style="cyan"
     ))
     
@@ -60,7 +60,7 @@ def chat_cmd():
             user_input = console.input("\n[bold green]You >[/bold green] ")
             
             if user_input.lower() in ("exit", "quit", "q"):
-                console.print("[yellow]Goodbye! 👋[/yellow]")
+                console.print("[yellow]Goodbye! Sir. JARVIS signing off. 👋[/yellow]")
                 break
             if user_input.lower() == "clear":
                 agent.clear_history()
@@ -72,19 +72,11 @@ def chat_cmd():
             if not user_input.strip():
                 continue
             
-            # Show thinking spinner while streaming
-            console.print("\n[bold cyan]AURA >[/bold cyan] ", end="")
+            console.print(f"\n[bold cyan]{agent.config.agent_name} >[/bold cyan] ", end="")
             
-            full_response = ""
-            def stream_callback(chunk: str):
-                # For rich live printing, we handle outside
-                pass
-            
-            # Non-streaming for now with spinner
-            with console.status("[bold cyan]AURA is thinking...[/bold cyan]", spinner="dots"):
+            with console.status(f"[bold cyan]{agent.config.agent_name} is thinking...[/bold cyan]", spinner="dots"):
                 response = agent.run(user_input, verbose=False)
             
-            # Print as markdown
             try:
                 md = Markdown(response)
                 console.print(md)
@@ -112,7 +104,7 @@ def run_cmd(
     console.print(Panel(
         f"[bold]Task:[/bold] {task}\n"
         f"[dim]Model: {agent.config.llm_provider}/{agent.config.llm_model} | Max steps: {agent.config.max_steps}[/dim]",
-        title=f"🚀 AURA Task Runner",
+        title=f"🚀 JARVIS Task Runner",
         border_style="green"
     ))
     
@@ -120,12 +112,12 @@ def run_cmd(
         def callback(chunk):
             console.print(chunk, end="")
         result = agent.run(task, stream_callback=callback, verbose=verbose)
-        console.print()  # newline after stream
+        console.print()
     else:
         if verbose:
             result = agent.run(task, verbose=True)
         else:
-            with console.status("[cyan]AURA working...[/cyan]"):
+            with console.status(f"[cyan]{agent.config.agent_name} working...[/cyan]"):
                 result = agent.run(task, verbose=False)
         
         console.print("\n" + "="*60)
@@ -137,7 +129,7 @@ def tools_cmd():
     agent = get_agent()
     tools = agent.registry.list_tools()
     
-    console.print(f"\n[bold cyan]🛠️  AURA has {len(tools)} tools:[/bold cyan]\n")
+    console.print(f"\n[bold cyan]🛠️  {agent.config.agent_name} has {len(tools)} tools:[/bold cyan]\n")
     for t in tools:
         console.print(f"[bold]{t.name}[/bold]: {t.description}")
         params = t.parameters.get("properties", {})
@@ -151,8 +143,9 @@ def server_cmd(
     port: int = typer.Option(8000, help="Port to bind")
 ):
     """Start web server with chat UI"""
-    console.print(f"[cyan]Starting AURA web server at http://{host}:{port}[/cyan]")
-    console.print(f"[dim]Open browser to chat with AURA via UI[/dim]\n")
+    agent = get_agent()
+    console.print(f"[cyan]Starting {agent.config.agent_name} web server at http://{host}:{port}[/cyan]")
+    console.print(f"[dim]Open browser to chat with {agent.config.agent_name} via UI[/dim]\n")
     
     try:
         import uvicorn
@@ -168,18 +161,17 @@ def memory_cmd(
     action: str = typer.Argument("list", help="list, search <query>, clear"),
     query: str = typer.Argument("", help="Search query if action=search")
 ):
-    """Manage AURA's memory"""
+    """Manage JARVIS's memory"""
     from agent.tools.memory import memory_list, memory_search
     from agent.config import AgentConfig
-    import pathlib
     config = AgentConfig()
     
     if action == "list":
         result = memory_list(20)
-        console.print(Panel(result, title="🧠 AURA Memory (recent 20)"))
+        console.print(Panel(result, title=f"🧠 {config.agent_name} Memory (recent 20)"))
     elif action == "search":
         if not query:
-            console.print("[red]Please provide search query: aura memory search 'your query'[/red]")
+            console.print(f"[red]Please provide search query: jarvis memory search 'your query'[/red]")
             return
         result = memory_search(query)
         console.print(Panel(result, title=f"🔍 Memory search: {query}"))
@@ -197,10 +189,9 @@ def memory_cmd(
 
 @app.command(name="init")
 def init_cmd():
-    """Initialize AURA workspace and config"""
-    console.print("[cyan]Initializing AURA...[/cyan]")
+    """Initialize JARVIS workspace and config"""
+    console.print("[cyan]Initializing JARVIS...[/cyan]")
     
-    # Create .env if not exists
     env_path = Path(".env")
     env_example = Path(".env.example")
     if not env_path.exists() and env_example.exists():
@@ -211,7 +202,6 @@ def init_cmd():
     elif env_path.exists():
         console.print("[dim].env already exists[/dim]")
     
-    # Create workspace
     workspace = Path("./workspace")
     workspace.mkdir(exist_ok=True)
     (workspace / ".gitkeep").touch(exist_ok=True)
@@ -229,7 +219,6 @@ def init_cmd():
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
     if ctx.invoked_subcommand is None:
-        # Default to chat if no command
         chat_cmd()
 
 if __name__ == "__main__":

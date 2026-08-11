@@ -9,10 +9,11 @@ from .prompts import SYSTEM_PROMPT, TOOL_USE_INSTRUCTIONS
 from .llm import LLMClient, MockLLMClient
 from .tools import get_registry
 
-class AURAAgent:
+class JARVISAgent:
     """
-    AURA - Autonomous Universal Reasoning Agent
+    JARVIS - Just A Rather Very Intelligent System
     Main agent orchestrator with ReAct loop
+    Inspired by Tony Stark's JARVIS - your personal AI companion
     """
     
     def __init__(self, config: Optional[AgentConfig] = None):
@@ -49,26 +50,17 @@ class AURAAgent:
         """Parse tool call from LLM response - supports JSON and OpenAI tool format"""
         text = text.strip()
         
-        # Try to find JSON object with "tool" key
-        # Pattern 1: {"tool": "name", "arguments": {...}}
-        json_pattern = r'\{[^{}]*"tool"\s*:\s*"[^"]+"\s*,\s*"arguments"\s*:\s*\{.*?\}\s*\}'
-        # More robust: find any JSON with tool
         try:
-            # Try direct parse if whole text is JSON
             if text.startswith("{") and '"tool"' in text:
-                # Balance braces
                 obj = json.loads(text)
                 if "tool" in obj:
                     return obj
         except:
             pass
         
-        # Search for JSON in text
         try:
-            # Find first { and last } and try parse iteratively
             start = text.find('{"tool"')
             if start != -1:
-                # Find matching closing brace
                 brace_count = 0
                 for i in range(start, len(text)):
                     if text[i] == '{':
@@ -82,7 +74,6 @@ class AURAAgent:
                                 if "tool" in obj:
                                     return obj
                             except:
-                                # Try to fix single quotes
                                 try:
                                     candidate_fixed = candidate.replace("'", '"')
                                     obj = json.loads(candidate_fixed)
@@ -94,20 +85,16 @@ class AURAAgent:
         except Exception:
             pass
         
-        # Try regex for simpler cases
         try:
             match = re.search(r'"tool"\s*:\s*"([^"]+)"', text)
             if match:
                 tool_name = match.group(1)
-                # Extract arguments
                 args_match = re.search(r'"arguments"\s*:\s*(\{.*\})', text, re.DOTALL)
                 if args_match:
                     args_str = args_match.group(1)
-                    # Balance braces for args
                     try:
                         args = json.loads(args_str)
                     except:
-                        # Try until valid json
                         for j in range(len(args_str), 0, -1):
                             try:
                                 args = json.loads(args_str[:j])
@@ -142,15 +129,13 @@ class AURAAgent:
             self.step_count += 1
             
             if verbose:
-                print(f"\n🤖 AURA Step {self.step_count}/{self.config.max_steps} thinking...")
+                print(f"\n🤖 JARVIS Step {self.step_count}/{self.config.max_steps} thinking...")
             
             messages = self._format_history_for_llm()
             tools_openai = self.registry.get_openai_tools()
             
-            # Get LLM response
             try:
                 if stream_callback:
-                    # Streaming mode
                     full_response = ""
                     for chunk in self.llm.chat_stream(messages, tools_openai):
                         full_response += chunk
@@ -167,9 +152,8 @@ class AURAAgent:
                 return error_msg
             
             if verbose and not stream_callback:
-                print(f"💭 AURA: {llm_response[:500]}...")
+                print(f"💭 JARVIS: {llm_response[:500]}...")
             
-            # Try to parse as tool call
             tool_call = self._parse_tool_call(llm_response)
             
             if tool_call:
@@ -179,40 +163,32 @@ class AURAAgent:
                 if verbose:
                     print(f"🔧 Using tool: {tool_name} with {arguments}")
                 
-                # Execute tool
                 tool_result = self.registry.execute(tool_name, arguments)
                 
                 if verbose:
                     print(f"📋 Tool result: {tool_result[:500]}...")
                 
-                # Add to history
                 self.conversation_history.append({
                     "role": "assistant",
-                    "content": llm_response  # The tool call JSON
+                    "content": llm_response
                 })
                 self.conversation_history.append({
                     "role": "user",
                     "content": f"TOOL RESULT [{tool_name}]:\n{tool_result}\n\nIf the task is complete, provide final answer. Otherwise continue with next tool."
                 })
-                
-                # If tool was memory related or final, check if we should continue
-                # Continue loop
             else:
-                # No tool call - this is final answer
                 final_answer = llm_response
                 self.conversation_history.append({"role": "assistant", "content": final_answer})
                 if verbose:
-                    print(f"\n✅ AURA Final Answer in {self.step_count} steps")
+                    print(f"\n✅ JARVIS Final Answer in {self.step_count} steps")
                 break
         else:
-            # Max steps reached
             final_answer = f"Reached max steps ({self.config.max_steps}). Last response: {llm_response}\n\nI've been working for {self.config.max_steps} steps - let me summarize what I found."
             self.conversation_history.append({"role": "assistant", "content": final_answer})
         
         return final_answer
     
     def chat_simple(self, message: str) -> str:
-        """Simple chat without tools (for quick responses)"""
         messages = self._format_history_for_llm()
         messages.append({"role": "user", "content": message})
         return self.llm.chat(messages, stream=False)
@@ -223,3 +199,6 @@ class AURAAgent:
     
     def get_tools_list(self) -> str:
         return self.registry.get_prompt_description()
+
+# Backward compatibility
+AURAAgent = JARVISAgent

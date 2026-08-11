@@ -1,7 +1,8 @@
-from .core import AURAAgent
+from .core import JARVISAgent
 from .config import AgentConfig
 
 if __name__ == "__main__":
     config = AgentConfig()
-    agent = AURAAgent(config)
-    print(f"AURA {config.agent_name} ready with {len(agent.registry.tools)} tools")
+    agent = JARVISAgent(config)
+    print(f"🤖 {config.agent_name} {config.agent_description} ready with {len(agent.registry.tools)} tools")
+    print("At your service, Sir.")

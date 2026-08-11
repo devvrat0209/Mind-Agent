@@ -43,7 +43,7 @@ def web_search(query: str, count: int = 5) -> str:
 )
 def fetch_page(url: str, max_chars: int = 8000) -> str:
     try:
-        headers = {"User-Agent": "AURA-Agent/0.1 (Research Bot)"}
+        headers = {"User-Agent": "JARVIS-Agent/0.1 (Research Bot)"}
         with httpx.Client(follow_redirects=True, timeout=15, headers=headers) as client:
             resp = client.get(url)
             resp.raise_for_status()

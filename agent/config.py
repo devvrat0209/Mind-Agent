@@ -8,8 +8,8 @@ load_dotenv()
 
 class AgentConfig(BaseModel):
     # Identity
-    agent_name: str = Field(default_factory=lambda: os.getenv("AGENT_NAME", "AURA"))
-    agent_description: str = "Autonomous Universal Reasoning Agent - Your all-rounder AI companion"
+    agent_name: str = Field(default_factory=lambda: os.getenv("AGENT_NAME", "JARVIS"))
+    agent_description: str = "Just A Rather Very Intelligent System - Your personal AI companion, inspired by Tony Stark's JARVIS"
     
     # LLM
     llm_provider: str = Field(default_factory=lambda: os.getenv("LLM_PROVIDER", "openai"))
