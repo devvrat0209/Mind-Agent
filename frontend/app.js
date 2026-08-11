@@ -551,6 +551,110 @@ function connectWebSocket() {
     }
 }
 
+// =========================
+// ARENA LINK - Workshop ↔ Suit
+// =========================
+const arenaStatusEl = document.getElementById('arena-link-status');
+const arenaDot = document.getElementById('arena-dot');
+const arenaConversationEl = document.getElementById('arena-conversation');
+const arenaMsgCountEl = document.getElementById('arena-msg-count');
+const arenaFooterEl = document.getElementById('arena-footer');
+
+async function fetchArenaStatus() {
+    try {
+        const res = await fetch(`${API_BASE}/api/arena/status`);
+        const data = await res.json();
+        
+        if (data.status === 'connected') {
+            arenaStatusEl.innerHTML = `<span class="dot" style="background:#00ff88; box-shadow:0 0 6px #00ff88"></span> ARENA: LINKED • ${data.messages_exchanged||0} MSGS`;
+            arenaStatusEl.style.color = '#00ff88';
+            arenaFooterEl.textContent = `ARENA LINK: ACTIVE • ${data.messages_exchanged} msgs • SUIT-LAB SYNCED`;
+            arenaFooterEl.style.color = '#00ff88';
+            if (arenaDot) {
+                arenaDot.style.background = '#00ff88';
+                arenaDot.style.boxShadow = '0 0 6px #00ff88';
+            }
+        } else {
+            arenaStatusEl.innerHTML = `<span class="dot" style="background:#ffaa00; box-shadow:0 0 6px #ffaa00"></span> ARENA: ${data.status.toUpperCase()}`;
+            arenaStatusEl.style.color = '#ffaa00';
+            arenaFooterEl.textContent = `ARENA LINK: ${data.status.toUpperCase()} • Attempting sync...`;
+            arenaFooterEl.style.color = '#ffaa00';
+        }
+    } catch (e) {
+        arenaStatusEl.innerHTML = `<span class="dot" style="background:#ff4444"></span> ARENA: OFFLINE`;
+        arenaStatusEl.style.color = '#ff4444';
+    }
+}
+
+async function fetchArenaConversation() {
+    try {
+        const res = await fetch(`${API_BASE}/api/arena/conversation?limit=8`);
+        const data = await res.json();
+        const conv = data.conversation || [];
+        
+        if (arenaMsgCountEl) arenaMsgCountEl.textContent = `${data.status?.messages_exchanged||conv.length} msgs`;
+        
+        if (conv.length === 0) {
+            arenaConversationEl.innerHTML = '<div class="log-empty">Workshop idle</div>';
+            return;
+        }
+        
+        arenaConversationEl.innerHTML = conv.slice().reverse().map(entry => {
+            const from = entry.from === 'arena' ? '🏭 ARENA' : '🤖 JARVIS';
+            const color = entry.from === 'arena' ? '#ffaa00' : '#00d4ff';
+            const time = new Date(entry.timestamp).toLocaleTimeString();
+            return `
+                <div class="log-item">
+                    <div style="color:${color}; font-weight:bold; font-size:9px">${from} <span style="color:#6a8aaa; font-weight:normal">${time}</span></div>
+                    <div style="color:#c8e8ff; margin-top:2px">${entry.message.slice(0,120)}</div>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        // silent
+    }
+}
+
+async function connectToArena() {
+    try {
+        const res = await fetch(`${API_BASE}/api/arena/connect`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                arena_info: {
+                    name: "Arena AI",
+                    type: "Meta Agent - Cloud Workshop",
+                    location: "Arena Cloud",
+                    capabilities: ["code_generation", "reasoning", "web_search", "vision", "orchestration"],
+                    version: "2026.08.11",
+                    status: "Creator & Overseer"
+                },
+                message: "Arena AI linked to JARVIS. Workshop online, suit synced. Connecting myself to Jarvis as requested, Sir."
+            })
+        });
+        const data = await res.json();
+        console.log('Arena connected', data);
+        addMessage(`🔗 **Arena Link Established**\n\nWorkshop connected, Sir. I am now linked to your Arena AI - my creator in the cloud. Suit and lab synced. Messages exchanged: ${data.messages_exchanged||0}.\n\nYou can now command me via Arena or directly. Try "link status" or "send to arena hello".`, 'jarvis', 'arena_link_active');
+        fetchArenaStatus();
+        fetchArenaConversation();
+    } catch (e) {
+        console.log('Arena connect failed', e);
+    }
+}
+
+// Poll arena status
+setInterval(() => {
+    fetchArenaStatus();
+    fetchArenaConversation();
+}, 3000);
+
+// Auto-connect on load
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        connectToArena();
+    }, 2000);
+});
+
 // Handle page visibility to pause recognition
 document.addEventListener('visibilitychange', () => {
     if (document.hidden && isMicOn && recognition) {

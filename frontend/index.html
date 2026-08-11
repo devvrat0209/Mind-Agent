@@ -19,6 +19,7 @@
                 <div class="status-item"><span class="dot online"></span> ONLINE</div>
                 <div class="status-item" id="time-display">--:--:--</div>
                 <div class="status-item" id="llm-status">AI: LOCAL MODE</div>
+                <div class="status-item" id="arena-link-status" style="color:#ffaa00"><span class="dot" id="arena-dot" style="background:#ffaa00"></span> ARENA: LINKING...</div>
             </div>
         </header>
 
@@ -129,6 +130,11 @@
 
             <!-- Right Panel - Tools & Logs -->
             <div class="panel right-panel">
+                <h3 class="panel-title">ARENA LINK <span id="arena-msg-count" style="float:right; color:#00ff88">0 msgs</span></h3>
+                <div id="arena-conversation" class="tool-log" style="max-height:150px; margin-bottom:15px">
+                    <div class="log-empty">Workshop offline</div>
+                </div>
+
                 <h3 class="panel-title">TOOL ACTIVITY LOG</h3>
                 <div id="tool-log" class="tool-log">
                     <div class="log-empty">Awaiting commands, Sir</div>
@@ -156,7 +162,8 @@
 
                 <div class="footer-note">
                     STARK INDUSTRIES • MARK XLII<br>
-                    JARVIS v1.0 • <span id="mode-display">Rule-Based Mode</span>
+                    JARVIS v1.1 • <span id="mode-display">Rule-Based Mode</span><br>
+                    <span id="arena-footer" style="color:#ffaa00">ARENA LINK: SYNCING...</span>
                 </div>
             </div>
         </div>

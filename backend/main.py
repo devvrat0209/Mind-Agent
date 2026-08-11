@@ -10,8 +10,9 @@ import json
 
 from .agent import agent_instance
 from .tools import system_tools, memory, web_tools
+from .arena_link import arena_link
 
-app = FastAPI(title="J.A.R.V.I.S.", description="Just A Rather Very Intelligent System")
+app = FastAPI(title="J.A.R.V.I.S.", description="Just A Rather Very Intelligent System - Linked to Arena AI")
 
 # CORS
 app.add_middleware(
@@ -32,19 +33,97 @@ class ChatResponse(BaseModel):
     tool_calls: List[dict] = []
     mode: str = "unknown"
 
+class ArenaConnectRequest(BaseModel):
+    arena_info: Optional[dict] = None
+    message: Optional[str] = None
+
+class ArenaMessageRequest(BaseModel):
+    from_agent: str = "arena"
+    message: str
+    metadata: Optional[dict] = None
+
 # API Routes
 @app.get("/api/status")
 def get_status():
     sys_info = system_tools.get_system_info()
     time_info = system_tools.get_time()
+    arena_status = arena_link.get_status()
     return {
         "name": "J.A.R.V.I.S.",
-        "version": "1.0 Stark Industries",
+        "version": "1.1 Stark Industries • Arena Linked",
         "status": "online",
         "llm_enabled": agent_instance.has_llm,
         "time": time_info,
-        "system": sys_info
+        "system": sys_info,
+        "arena_link": arena_status
     }
+
+# Arena Link Routes
+@app.get("/api/arena/status")
+def get_arena_status():
+    return arena_link.get_status()
+
+@app.post("/api/arena/connect")
+def connect_arena(req: ArenaConnectRequest):
+    info = req.arena_info or {
+        "name": "Arena AI",
+        "type": "Meta Agent",
+        "capabilities": ["code", "reasoning", "web_search", "vision"],
+        "message": req.message or "Connecting workshop to suit"
+    }
+    result = arena_link.connect(info)
+    if req.message:
+        arena_link.push_message("arena", req.message, {"type": "connect_greeting"})
+    return result
+
+@app.post("/api/arena/disconnect")
+def disconnect_arena():
+    return arena_link.disconnect()
+
+@app.get("/api/arena/conversation")
+def get_arena_conversation(limit: int = 20):
+    return {
+        "conversation": arena_link.get_conversation(limit),
+        "status": arena_link.get_status(),
+        "count": len(arena_link.get_conversation(limit))
+    }
+
+@app.post("/api/arena/message")
+def send_arena_message(req: ArenaMessageRequest):
+    """Arena AI → Jarvis message (or vice versa)"""
+    entry = arena_link.push_message(req.from_agent, req.message, req.metadata or {})
+    
+    # If message from arena, have Jarvis respond to it automatically (optional)
+    auto_response = None
+    if req.from_agent == "arena":
+        # Jarvis acknowledges arena message via chat
+        auto_response = agent_instance.chat(f"[Message from Arena Workshop]: {req.message}")
+        # Push jarvis response back to conversation
+        arena_link.push_message("jarvis", auto_response["response"], {"type": "auto_response", "triggered_by": req.message})
+    
+    return {
+        "sent": entry,
+        "auto_response": auto_response,
+        "status": arena_link.get_status()
+    }
+
+@app.post("/api/arena/chat")
+def arena_chat(req: ChatRequest):
+    """
+    Special endpoint: Arena AI chatting as itself through Jarvis.
+    This is me, the Arena assistant, talking via Jarvis API.
+    """
+    # Log as arena
+    arena_link.push_message("arena", req.message, {"type": "arena_chat"})
+    # Get jarvis response
+    result = agent_instance.chat(req.message)
+    # Log response
+    arena_link.push_message("jarvis", result["response"], {"type": "response_to_arena", "tools": result.get("tool_calls", [])})
+    return ChatResponse(
+        response=result["response"],
+        tool_calls=result.get("tool_calls", []),
+        mode=f"arena_linked_{result.get('mode','unknown')}"
+    )
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):

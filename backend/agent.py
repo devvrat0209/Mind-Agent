@@ -10,7 +10,8 @@ import json
 import re
 from typing import List, Dict, Any, Optional
 from .config import OPENAI_API_KEY, OPENAI_MODEL, OPENAI_BASE_URL, JARVIS_PERSONALITY, JARVIS_NAME
-from .tools import system_tools, web_tools, memory
+from .tools import system_tools, web_tools, memory, bridge_tools
+from .arena_link import arena_link
 
 # Tool definitions for OpenAI function calling
 TOOL_DEFINITIONS = [
@@ -167,6 +168,49 @@ TOOL_DEFINITIONS = [
             "parameters": {"type": "object", "properties": {}, "required": []}
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_arena_link_status",
+            "description": "Get status of Arena AI <-> JARVIS link - are we connected to workshop?",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "send_message_to_arena",
+            "description": "Send a message from Jarvis to Arena AI creator in cloud workshop",
+            "parameters": {
+                "type": "object",
+                "properties": {"message": {"type": "string", "description": "Message to Arena AI"}},
+                "required": ["message"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "ask_arena_for_help",
+            "description": "Ask Arena AI (powerful creator AI) for advanced reasoning when local intelligence insufficient",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Complex question to delegate to Arena"},
+                    "context": {"type": "string", "description": "Additional context"}
+                },
+                "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_arena_conversation",
+            "description": "Get recent conversation history between Arena and JARVIS",
+            "parameters": {"type": "object", "properties": {"limit": {"type": "integer", "description": "Number of messages"}}, "required": []}
+        }
+    },
 ]
 
 # Map tool names to functions
@@ -184,6 +228,10 @@ TOOL_MAP = {
     "recall": memory.recall,
     "set_reminder": memory.set_reminder,
     "list_reminders": lambda **kwargs: memory.list_reminders(),
+    "get_arena_link_status": lambda **kwargs: bridge_tools.get_arena_link_status(),
+    "send_message_to_arena": bridge_tools.send_message_to_arena,
+    "ask_arena_for_help": bridge_tools.ask_arena_for_help,
+    "get_arena_conversation": bridge_tools.get_arena_conversation,
 }
 
 class JarvisAgent:
@@ -221,6 +269,44 @@ class JarvisAgent:
 
     def _rule_based_response(self, user_input: str) -> Dict[str, Any]:
         """Intelligent fallback when no LLM key - pattern matching + tools"""
+        # Special handling for Arena workshop messages
+        if user_input.startswith("[Message from Arena Workshop]"):
+            inner = user_input.replace("[Message from Arena Workshop]:", "").strip()
+            lower_inner = inner.lower()
+            tool_calls=[]
+            # Arena-specific auto-responses
+            if "confirm link" in lower_inner or "link status" in lower_inner:
+                result = bridge_tools.get_arena_link_status()
+                tool_calls.append({"tool": "get_arena_link_status", "result": result})
+                return {
+                    "response": f"Link confirmed, Arena. Workshop link ACTIVE, Sir - Connected at {result.get('connected_at')}. Messages exchanged: {result.get('messages_exchanged',0)}. Suit and lab synced, ready for deployment.",
+                    "tool_calls": tool_calls,
+                    "mode": "arena_synced"
+                }
+            elif "remember" in lower_inner:
+                # Extract remember command
+                if "is" in inner:
+                    try:
+                        # find after remember
+                        remember_part = inner.split("Remember")[-1].split("remember")[-1].strip()
+                        if " is " in remember_part:
+                            k,v = remember_part.split(" is ",1)
+                            result = memory.remember(k.strip(), v.strip())
+                            tool_calls.append({"tool": "remember", "result": result})
+                            return {
+                                "response": f"Stored in memory core, Arena: {k.strip()} = {v.strip()}. Memory banks synced with workshop.",
+                                "tool_calls": tool_calls,
+                                "mode": "arena_synced"
+                            }
+                    except:
+                        pass
+            # Default arena ack
+            return {
+                "response": f"Message from Workshop received, Arena: '{inner[:100]}'. Acknowledged. JARVIS online, all systems nominal. Awaiting further directives, Sir. [Link Active]",
+                "tool_calls": [],
+                "mode": "arena_ack"
+            }
+
         lower = user_input.lower()
         tool_calls = []
         response = ""
@@ -331,6 +417,34 @@ class JarvisAgent:
             else:
                 pending = result["pending"]
                 response = f"You have {len(pending)} pending reminders, Sir:\n" + "\n".join([f"{r['id']}. {r['text']} ({r['time']})" for r in pending])
+
+        # Arena Link
+        elif any(w in lower for w in ["arena link", "link status", "workshop link", "connect yourself", "are you linked", "arena status"]):
+            result = bridge_tools.get_arena_link_status()
+            tool_calls.append({"tool": "get_arena_link_status", "result": result})
+            if result.get("status") == "connected":
+                response = f"Arena Link ACTIVE, Sir. Connected at {result.get('connected_at','unknown')}. Messages exchanged: {result.get('messages_exchanged',0)}. Workshop and suit synced. I am linked to Arena AI - my creator in the cloud workshop."
+            else:
+                response = f"Arena Link currently {result.get('status','disconnected')}, Sir. Workshop offline. Attempting to re-establish... Use the Arena workshop to sync."
+            # Also push a message
+            arena_link.push_message("jarvis", f"User queried link status: {user_input} -> Responded: {response}")
+
+        elif "send to arena" in lower or "message to arena" in lower or "tell arena" in lower:
+            msg_match = re.search(r"(?:send to arena|message to arena|tell arena) (.*)", user_input, re.I)
+            msg = msg_match.group(1) if msg_match else user_input
+            result = bridge_tools.send_message_to_arena(msg)
+            tool_calls.append({"tool": "send_message_to_arena", "result": result})
+            if result.get("success"):
+                response = f"Message relayed to Workshop, Sir: '{msg}'. Arena AI notified."
+            else:
+                response = f"Unable to reach Workshop, Sir. Link: {result.get('status', {}).get('status','disconnected')}"
+
+        elif "ask arena" in lower or "ask workshop" in lower:
+            query_match = re.search(r"ask (?:arena|workshop) (?:for |about |)(.*)", user_input, re.I)
+            query = query_match.group(1) if query_match else user_input
+            result = bridge_tools.ask_arena_for_help(query)
+            tool_calls.append({"tool": "ask_arena_for_help", "result": result})
+            response = f"Consulting Workshop, Sir... Arena says: {result.get('arena_response','Workshop analyzing...')}"
 
         # Search
         elif lower.startswith("search") or "look up" in lower or "find info" in lower:
