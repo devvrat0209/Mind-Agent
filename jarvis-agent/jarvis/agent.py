@@ -36,6 +36,7 @@ class Agent:
                     tools=self.tools.tool_schemas,
                     temperature=self.config.llm_temperature,
                     max_tokens=self.config.llm_max_tokens,
+                    **self.config.llm_kwargs(),
                 )
             except Exception as e:
                 error_msg = f"LLM error: {e}"

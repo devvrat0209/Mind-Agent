@@ -1,7 +1,7 @@
 [project]
 name = "jarvis-agent"
-version = "0.3.0"
-description = "A self-editing AI agent — JARVIS that modifies its own code, runs on Telegram, has full device access"
+version = "0.4.0"
+description = "A self-editing AI agent — JARVIS with NVIDIA NIM + Telegram integration, device-aware setup wizard and REST API"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -14,11 +14,24 @@ dependencies = [
     "psutil>=5.9.0",
     "aiohttp>=3.9.0",
     "python-dotenv>=1.0.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.29.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.6.0",
 ]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.110.0", "uvicorn[standard]>=0.29.0"]
+cuda = ["nvidia-ml-py>=12.550.52"]
 
 [project.scripts]
 jarvis = "jarvis.cli:main"
+jarvis-api = "jarvis.api:serve"
+jarvis-telegram = "jarvis.telegram_bot:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["jarvis*"]

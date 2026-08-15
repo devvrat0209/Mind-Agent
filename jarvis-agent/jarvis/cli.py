@@ -1,207 +1,324 @@
-"""CLI — one entry point. First run = setup wizard, then = start bot."""
+"""CLI entry point.
 
-import os
-import sys
-import subprocess
-from pathlib import Path
-
-from rich.console import Console
-from rich.prompt import Prompt, Confirm
-from rich.panel import Panel
-from rich.text import Text
-from rich.theme import Theme
-
-from .config import Config
-
-THEME = Theme({
-    "jarvis": "cyan bold",
-    "dim": "dim",
-    "good": "green bold",
-    "bad": "red bold",
-    "warn": "yellow",
-})
-
-BANNER = """
-[bold cyan]   ██╗ █████╗ ██████╗ █████╗ ██████╗ ██████╗ ██████╗
-   ╚═╝██╔══██╗██╔══██╗██╔══██╗██╔══██╗██╔═══██╗██╔══██╗
-      ██║  ██║██████╔╝███████║██║  ██║██║   ██║██████╔╝
-      ██║  ██║██╔══██╗██╔══██║██║  ██║██║   ██║██╔═══╝
-      ╚█████╔╝██║  ██║██║  ██║██████╔╝╚██████╔╝██║
-       ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝ ╚═╝[/bold cyan]
+    jarvis                 first run = setup wizard, then start the Telegram bot
+    jarvis setup [section] re-run the wizard (device|deps|llm|nim|telegram|api)
+    jarvis doctor          check device, dependencies and configuration
+    jarvis install         install missing dependencies for this device
+    jarvis device          print detected hardware as JSON
+    jarvis api             start the REST API server
+    jarvis bot             start the Telegram bot
+    jarvis nim <sub>       NIM helpers: status | models | test
 """
 
-ENV_FILE = Path(__file__).parent.parent / ".env"
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+from . import deps as depmod
+from .wizard import (
+    BANNER,
+    ENV_FILE,
+    UI,
+    is_configured,
+    load_env_into_process,
+    read_env,
+    run_doctor,
+    run_wizard,
+)
+
+SETUP_SECTIONS = ("device", "deps", "llm", "nim", "telegram", "api")
 
 
-def get_env(key: str) -> str:
-    """Get value from .env or environment."""
-    val = os.getenv(key, "")
-    if not val and ENV_FILE.exists():
-        for line in ENV_FILE.read_text().splitlines():
-            if line.startswith(f"{key}="):
-                val = line.split("=", 1)[1].strip()
-                break
-    return val
+# ── bootstrap ──────────────────────────────────────────────────────────
 
+def ensure_runtime(groups: tuple[str, ...], quiet: bool = False) -> bool:
+    """Make sure the packages a command needs are present; install if not."""
+    statuses = depmod.check_all(groups)
+    gaps = depmod.missing(statuses)
+    if not gaps:
+        return True
 
-def set_env(key: str, value: str):
-    """Write a key=value to .env."""
-    if ENV_FILE.exists():
-        lines = ENV_FILE.read_text().splitlines()
-    else:
-        lines = []
+    ui = UI()
+    ui.print()
+    ui.warn(f"Missing: {', '.join(g.req.dist for g in gaps)}")
+    ui.info(f"Device: {depmod.device().summary}")
+    ui.info("Installing automatically…")
+    ui.print()
 
-    found = False
-    for i, line in enumerate(lines):
-        if line.startswith(f"{key}=") or line == key:
-            lines[i] = f"{key}={value}"
-            found = True
-            break
-    if not found:
-        lines.append(f"{key}={value}")
+    results = depmod.install([g.req for g in gaps], log=(lambda m: None) if quiet else ui.info)
+    failed = [r for r in results if not r.ok]
+    if failed:
+        ui.print()
+        for r in failed:
+            ui.bad(f"{r.spec} failed to install")
+        ui.info(failed[0].output[-600:])
+        ui.print()
+        ui.warn("Install them manually, then retry.")
+        return False
 
-    ENV_FILE.write_text("\n".join(lines) + "\n")
-
-
-def is_configured() -> bool:
-    """Check if we have the minimum config to run."""
-    token = get_env("JARVIS_TELEGRAM_TOKEN") or get_env("TELEGRAM_BOT_TOKEN")
-    return bool(token)
-
-
-def run_setup(console: Console):
-    """Interactive setup wizard — first run experience."""
-    console.print(BANNER)
-    console.print("[jarvis]First run — let's set you up.[/jarvis]\n")
-
-    # ── LLM ──────────────────────────────────────────────
-    console.rule("[jarvis]LLM Provider[/jarvis]")
-
-    console.print("\nPick your LLM provider:")
-    console.print("  [1] OpenAI (GPT-4o) — best quality, needs API key")
-    console.print("  [2] Anthropic (Claude) — great quality, needs API key")
-    console.print("  [3] Ollama (local) — free, runs on your machine, needs GPU")
-    console.print("  [4] Groq — fast, free tier available")
-    console.print("  [5] Other (enter model string directly)")
-
-    choice = Prompt.ask("\n  Choice", choices=["1", "2", "3", "4", "5"], default="1", console=console)
-
-    if choice == "1":
-        model = "openai/gpt-4o"
-        key_name = "OPENAI_API_KEY"
-        key_label = "OpenAI API key"
-    elif choice == "2":
-        model = "anthropic/claude-sonnet-4-20250514"
-        key_name = "ANTHROPIC_API_KEY"
-        key_label = "Anthropic API key"
-    elif choice == "3":
-        model = Prompt.ask("  Ollama model name", default="ollama/llama3", console=console)
-        key_name = None
-        key_label = None
-    elif choice == "4":
-        model = "groq/llama-3.3-70b-versatile"
-        key_name = "GROQ_API_KEY"
-        key_label = "Groq API key"
-    else:
-        model = Prompt.ask("  Model string (e.g. openai/gpt-4o)", console=console)
-        key_name = None
-        key_label = None
-
-    set_env("JARVIS_LLM", model)
-    console.print(f"  [good]✓ Model: {model}[/good]")
-
-    if key_name and key_label:
-        key = Prompt.ask(f"\n  {key_label}", console=console, password=True)
-        if key:
-            set_env(key_name, key)
-            console.print(f"  [good]✓ Key saved[/good]")
-
-    # ── Telegram ─────────────────────────────────────────
-    console.print()
-    console.rule("[jarvis]Telegram Bot[/jarvis]")
-
-    console.print("\n  You need a Telegram bot token.")
-    console.print("  [dim]1. Open Telegram, search @BotFather[/dim]")
-    console.print("  [dim]2. Send /newbot[/dim]")
-    console.print("  [dim]3. Pick a name and username[/dim]")
-    console.print("  [dim]4. Copy the token it gives you[/dim]")
-
-    token = Prompt.ask("\n  Bot token", console=console)
-    if token:
-        set_env("JARVIS_TELEGRAM_TOKEN", token)
-        console.print("  [good]✓ Token saved[/good]")
-
-    # ── User ID ──────────────────────────────────────────
-    console.print()
-    console.rule("[jarvis]Access Control[/jarvis]")
-
-    console.print("\n  Lock JARVIS to your Telegram account?")
-    console.print("  [dim]Find your ID: message @userinfobot on Telegram[/dim]")
-
-    lock = Confirm.ask("  Restrict access?", default=True, console=console)
-    if lock:
-        uid = Prompt.ask("  Your Telegram user ID", console=console)
-        if uid:
-            set_env("JARVIS_TELEGRAM_USERS", uid)
-            console.print("  [good]✓ Locked to your account[/good]")
-    else:
-        set_env("JARVIS_TELEGRAM_USERS", "")
-        console.print("  [warn]⚠ Anyone who finds your bot can use it[/warn]")
-
-    # ── Done ─────────────────────────────────────────────
-    console.print()
-    console.rule("[jarvis]Ready[/jarvis]")
-    console.print("\n  [good]Configuration saved![/good]")
-    console.print(f"  Config file: [dim]{ENV_FILE}[/dim]\n")
-
+    ui.ok("Dependencies ready")
+    ui.print()
     return True
 
 
-def start_bot(console: Console):
-    """Start the Telegram bot."""
-    console.print(BANNER)
-    console.print("[jarvis]Starting JARVIS...[/jarvis]\n")
+# ── commands ───────────────────────────────────────────────────────────
 
-    # Load .env into process environment
-    if ENV_FILE.exists():
-        for line in ENV_FILE.read_text().splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
+def cmd_setup(args) -> int:
+    section = args.section
+    if section and section not in SETUP_SECTIONS:
+        print(f"Unknown section '{section}'. Choose from: {', '.join(SETUP_SECTIONS)}")
+        return 2
+    run_wizard(auto_deps=not args.no_auto_install, only=section)
+    return 0
+
+
+def cmd_doctor(args) -> int:
+    return run_doctor()
+
+
+def cmd_install(args) -> int:
+    ui = UI()
+    ui.print(f"[jarvis]{BANNER}[/jarvis]")
+    dev = depmod.device()
+    ui.print(f"  [dim]{dev.summary}[/dim]")
+    ui.print(f"  [dim]pip target: {dev.pip_target}[/dim]")
+    ui.print()
+
+    groups = tuple(args.groups) if args.groups else depmod.GROUPS
+    statuses, results = depmod.ensure(
+        groups=groups,
+        auto=True,
+        include_optional=args.optional,
+        dry_run=args.dry_run,
+        log=ui.info,
+    )
+    ui.print()
+    if not results:
+        ui.ok("Nothing to install — all dependencies satisfied")
+        return 0
+
+    failed = [r for r in results if not r.ok]
+    for r in results:
+        (ui.ok if r.ok else ui.bad)(r.spec)
+    if failed:
+        ui.print()
+        ui.info(failed[0].output[-800:])
+        return 1
+
+    # system tools
+    if args.system:
+        ui.print()
+        for tool, meta in depmod.check_system_tools(dev).items():
+            if meta["present"]:
                 continue
-            key, val = line.split("=", 1)
-            os.environ.setdefault(key.strip(), val.strip())
+            ok, out = depmod.install_system_tool(tool, dev)
+            (ui.ok if ok else ui.warn)(f"{tool}: {'installed' if ok else out.strip()[-160:]}")
+
+    ui.print()
+    ui.ok("Done")
+    return 0
+
+
+def cmd_device(args) -> int:
+    from .platform_detect import device as _device
+
+    dev = _device(refresh=True)
+    if args.json:
+        print(json.dumps(dev.to_dict(), indent=2))
+        return 0
+
+    ui = UI()
+    ui.print(f"[jarvis]{BANNER}[/jarvis]")
+    from .wizard import step_device
+    step_device(ui)
+    return 0
+
+
+def cmd_api(args) -> int:
+    load_env_into_process()
+    if not ensure_runtime(("core", "nim")):
+        return 1
+
+    host = args.host or os.getenv("JARVIS_API_HOST", "127.0.0.1")
+    port = int(args.port or os.getenv("JARVIS_API_PORT", "8088"))
+
+    ui = UI()
+    ui.print(f"[jarvis]{BANNER}[/jarvis]")
+    ui.print(f"  [jarvis]REST API[/jarvis]  http://{host}:{port}")
+    ui.info(f"docs: http://{host}:{port}/docs")
+    ui.info(f"auth: {'Bearer token required' if os.getenv('JARVIS_API_KEY') else 'open (no key set)'}")
+    ui.print()
+
+    from .api import serve
+    serve(host=host, port=port)
+    return 0
+
+
+def cmd_bot(args) -> int:
+    load_env_into_process()
+    if not ensure_runtime(("core", "telegram", "device")):
+        return 1
+    return start_bot()
+
+
+def cmd_nim(args) -> int:
+    load_env_into_process()
+    from . import nim as nimmod
+
+    ui = UI()
+    cfg = nimmod.NIMConfig.from_env()
+
+    if args.nim_command == "status":
+        ui.rule("NVIDIA NIM")
+        ui.print()
+        ui.print(f"  Mode      [dim]{cfg.mode}[/dim]")
+        ui.print(f"  Endpoint  [dim]{cfg.api_base}[/dim]")
+        ui.print(f"  Model     [dim]{cfg.model}[/dim]")
+        ui.print(f"  API key   [dim]{cfg.masked_key()}[/dim]")
+        ui.print()
+        check = nimmod.validate_key(cfg)
+        (ui.ok if check.ok else ui.bad)(f"{check.message} ({check.latency_ms} ms)")
+        return 0 if check.ok else 1
+
+    if args.nim_command == "models":
+        models = nimmod.list_models(cfg)
+        if not models:
+            ui.bad("Could not list models — check `jarvis nim status`")
+            return 1
+        for m in models:
+            marker = " [good]← current[/good]" if m == cfg.model else ""
+            ui.print(f"  {m}{marker}")
+        ui.print()
+        ui.info(f"{len(models)} models")
+        return 0
+
+    if args.nim_command == "test":
+        ui.info("Checking endpoint…")
+        check = nimmod.validate_key(cfg)
+        (ui.ok if check.ok else ui.bad)(check.message)
+        if not check.ok:
+            return 1
+        ui.info(f"Testing {cfg.model}…")
+        t = nimmod.test_completion(cfg)
+        (ui.ok if t.ok else ui.bad)(f"{t.message} ({t.latency_ms} ms)")
+        return 0 if t.ok else 1
+
+    return 2
+
+
+# ── bot start ──────────────────────────────────────────────────────────
+
+def start_bot() -> int:
+    ui = UI()
+    ui.print(f"[jarvis]{BANNER}[/jarvis]")
+    load_env_into_process()
+
+    from .platform_detect import device as _device
+    dev = _device()
 
     model = os.getenv("JARVIS_LLM", "openai/gpt-4o")
-    workspace = os.getenv("JARVIS_WORKSPACE", str(Path.cwd()))
+    ui.print(f"  Model     [dim]{model}[/dim]")
+    ui.print(f"  Device    [dim]{dev.summary}[/dim]")
+    ui.print(f"  Config    [dim]{ENV_FILE}[/dim]")
 
-    console.print(f"  Model:     [dim]{model}[/dim]")
-    console.print(f"  Workspace: [dim]{workspace}[/dim]")
-    console.print(f"  Config:    [dim]{ENV_FILE}[/dim]")
-    console.print()
-    console.print("[jarvis]Connecting to Telegram...[/jarvis]")
-    console.print("[dim]Talk to your bot on Telegram. Press Ctrl+C to stop.[/dim]\n")
+    # optionally run the API alongside the bot
+    if os.getenv("JARVIS_API_ENABLED", "0") == "1":
+        host = os.getenv("JARVIS_API_HOST", "127.0.0.1")
+        port = int(os.getenv("JARVIS_API_PORT", "8088"))
+        try:
+            import threading
+            import uvicorn
+            from .api import create_app
 
-    # Import and run the telegram bot
+            def _run():
+                uvicorn.run(create_app(), host=host, port=port, log_level="warning")
+
+            threading.Thread(target=_run, daemon=True).start()
+            ui.print(f"  API       [dim]http://{host}:{port}[/dim]")
+        except Exception as e:
+            ui.warn(f"API failed to start: {e}")
+
+    ui.print()
+    ui.print("  [jarvis]Connecting to Telegram…[/jarvis]")
+    ui.info("Talk to your bot. Ctrl+C to stop.")
+    ui.print()
+
     from .telegram_bot import main as bot_main
     bot_main()
+    return 0
 
 
-def main():
-    """Entry point: jarvis"""
-    console = Console(theme=THEME)
+# ── parser ─────────────────────────────────────────────────────────────
 
-    # If not configured, run setup
-    if not is_configured():
-        run_setup(console)
-        # After setup, ask if they want to start now
-        if Confirm.ask("\n  Start JARVIS now?", default=True, console=console):
-            start_bot(console)
-        else:
-            console.print("\n  [jarvis]Run 'jarvis' anytime to start.[/jarvis]")
-        return
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="jarvis",
+        description="JARVIS — self-editing AI agent with NVIDIA NIM + Telegram",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    sub = p.add_subparsers(dest="command")
 
-    # Already configured — just start
-    start_bot(console)
+    s = sub.add_parser("setup", help="run the setup wizard")
+    s.add_argument("section", nargs="?", help=f"one of: {', '.join(SETUP_SECTIONS)}")
+    s.add_argument("--no-auto-install", action="store_true",
+                   help="ask before installing missing dependencies")
+    s.set_defaults(func=cmd_setup)
+
+    s = sub.add_parser("doctor", help="check device, dependencies and config")
+    s.set_defaults(func=cmd_doctor)
+
+    s = sub.add_parser("install", help="install missing dependencies for this device")
+    s.add_argument("groups", nargs="*", help=f"limit to groups: {', '.join(depmod.GROUPS)}")
+    s.add_argument("--optional", action="store_true", help="include optional packages")
+    s.add_argument("--system", action="store_true", help="also install system tools (git, ffmpeg)")
+    s.add_argument("--dry-run", action="store_true", help="show commands without running them")
+    s.set_defaults(func=cmd_install)
+
+    s = sub.add_parser("device", help="show detected hardware")
+    s.add_argument("--json", action="store_true", help="machine-readable output")
+    s.set_defaults(func=cmd_device)
+
+    s = sub.add_parser("api", help="start the REST API server")
+    s.add_argument("--host", help="bind address (default 127.0.0.1)")
+    s.add_argument("--port", type=int, help="port (default 8088)")
+    s.set_defaults(func=cmd_api)
+
+    s = sub.add_parser("bot", help="start the Telegram bot")
+    s.set_defaults(func=cmd_bot)
+
+    s = sub.add_parser("nim", help="NVIDIA NIM helpers")
+    s.add_argument("nim_command", choices=["status", "models", "test"])
+    s.set_defaults(func=cmd_nim)
+
+    return p
+
+
+def main() -> None:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    if args.command is None:
+        # bare `jarvis` — wizard on first run, otherwise start the bot
+        load_env_into_process()
+        if not is_configured():
+            run_wizard(auto_deps=True)
+            load_env_into_process()
+            ui = UI()
+            if is_configured() and ui.confirm("Start JARVIS now?", default=True):
+                sys.exit(cmd_bot(args) if hasattr(args, "func") else start_bot())
+            ui.print()
+            ui.print("  [jarvis]Run 'jarvis' anytime to start.[/jarvis]")
+            sys.exit(0)
+        if not ensure_runtime(("core", "telegram", "device")):
+            sys.exit(1)
+        sys.exit(start_bot())
+
+    sys.exit(args.func(args) or 0)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ Requires: JARVIS_TELEGRAM_TOKEN env var
 import os
 import sys
 import json
+import time
 import asyncio
 import logging
 import signal
@@ -29,17 +30,39 @@ from telegram.constants import ParseMode
 from .config import Config
 from .agent import Agent
 
-# Logging — file + stdout for VPS
-log_dir = Path(os.getenv("JARVIS_LOG_DIR", "/var/log/jarvis"))
-log_dir.mkdir(parents=True, exist_ok=True)
+# Logging — file + stdout for VPS.
+# Fall back to a writable location when /var/log isn't ours (user installs,
+# Termux, unprivileged containers).
+def _resolve_log_dir() -> Path:
+    candidates = [os.getenv("JARVIS_LOG_DIR"), "/var/log/jarvis",
+                  str(Path.home() / ".jarvis" / "logs"), "/tmp/jarvis"]
+    for cand in candidates:
+        if not cand:
+            continue
+        p = Path(cand)
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            probe = p / ".write_test"
+            probe.touch()
+            probe.unlink()
+            return p
+        except OSError:
+            continue
+    return Path("/tmp")
+
+
+log_dir = _resolve_log_dir()
+
+_handlers = [logging.StreamHandler(sys.stdout)]
+try:
+    _handlers.append(logging.FileHandler(log_dir / "jarvis.log"))
+except OSError:
+    pass
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(log_dir / "jarvis.log"),
-    ],
+    handlers=_handlers,
 )
 logger = logging.getLogger("jarvis.telegram")
 
@@ -78,6 +101,9 @@ class TelegramJarvis:
         app.add_handler(CommandHandler("restart", self.cmd_restart))
         app.add_handler(CommandHandler("log", self.cmd_log))
         app.add_handler(CommandHandler("uptime", self.cmd_uptime))
+        app.add_handler(CommandHandler("device", self.cmd_device))
+        app.add_handler(CommandHandler("nim", self.cmd_nim))
+        app.add_handler(CommandHandler("deps", self.cmd_deps))
         # Media
         app.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
         app.add_handler(MessageHandler(filters.Document.ALL, self.handle_document))
@@ -117,6 +143,9 @@ class TelegramJarvis:
             "/reset — Reset conversation\n"
             "/status — Server status\n"
             "/uptime — Uptime info\n"
+            "/device — Hardware & GPU info\n"
+            "/nim — NVIDIA NIM status / switch model\n"
+            "/deps — Dependency health\n"
             "/inspect — Self-inspect source\n"
             "/diff — Git diff\n"
             "/rollback — Undo last edit\n"
@@ -212,6 +241,100 @@ class TelegramJarvis:
             await update.message.reply_text(f"```\n{text[-4000:]}\n```", parse_mode=ParseMode.MARKDOWN)
         else:
             await update.message.reply_text("No log file found.")
+
+    async def cmd_device(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show detected hardware."""
+        if not self._is_authorized(update.effective_user.id):
+            return
+        from .platform_detect import device
+        dev = device()
+        gpu = dev.gpu
+        gpu_line = "none (CPU only)"
+        if gpu.available:
+            gpu_line = gpu.name or gpu.vendor
+            if gpu.count > 1:
+                gpu_line += f" x{gpu.count}"
+            if gpu.memory_mb:
+                gpu_line += f" · {gpu.memory_mb} MB"
+            if gpu.cuda_version:
+                gpu_line += f" · CUDA {gpu.cuda_version}"
+        await update.message.reply_text(
+            f"*Device*\n\n"
+            f"OS: `{dev.os_name}`\n"
+            f"Arch: `{dev.arch}`\n"
+            f"Python: `{dev.python_version}`\n"
+            f"CPU/RAM: `{dev.cpu_count} cores · {dev.memory_gb} GB`\n"
+            f"Disk free: `{dev.disk_free_gb} GB`\n"
+            f"GPU: `{gpu_line}`\n"
+            f"Accelerator: `{dev.accelerator}`\n"
+            f"Install target: `{dev.pip_target}`",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+    async def cmd_nim(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """NVIDIA NIM status, or switch model with /nim <model-id>."""
+        if not self._is_authorized(update.effective_user.id):
+            return
+        from . import nim as nimmod
+
+        args = context.args or []
+        cfg = nimmod.NIMConfig.from_env()
+
+        if args:
+            cfg.model = args[0]
+            cfg.apply_to_env()
+            self.config.llm_model = cfg.litellm_model
+            await update.message.reply_text(
+                f"NIM model set to `{cfg.model}`", parse_mode=ParseMode.MARKDOWN)
+            return
+
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        check = nimmod.validate_key(cfg)
+        icon = "OK" if check.ok else "FAIL"
+        await update.message.reply_text(
+            f"*NVIDIA NIM — {icon}*\n\n"
+            f"Mode: `{cfg.mode}`\n"
+            f"Endpoint: `{cfg.api_base}`\n"
+            f"Model: `{cfg.model}`\n"
+            f"Key: `{cfg.masked_key()}`\n"
+            f"Status: {check.message}\n"
+            f"Latency: `{check.latency_ms} ms`\n\n"
+            f"_Switch model:_ `/nim meta/llama-3.1-8b-instruct`",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+    async def cmd_deps(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Dependency health; /deps install to fix missing ones."""
+        if not self._is_authorized(update.effective_user.id):
+            return
+        from . import deps as depmod
+
+        args = context.args or []
+        if args and args[0] == "install":
+            await update.message.reply_text("Installing missing dependencies...")
+            statuses, results = depmod.ensure(auto=True)
+            failed = [r.spec for r in results if not r.ok]
+            if not results:
+                await update.message.reply_text("Nothing to install.")
+            elif failed:
+                await update.message.reply_text(f"Failed: {', '.join(failed)}")
+            else:
+                await update.message.reply_text(
+                    f"Installed {len(results)} package(s). Use /restart to reload.")
+            return
+
+        statuses = depmod.check_all()
+        lines = []
+        for s_ in statuses:
+            mark = "OK  " if s_.satisfied else ("opt " if s_.req.optional else "MISS")
+            lines.append(f"{mark} {s_.req.dist:<22} {s_.version or s_.reason}")
+        gaps = depmod.missing(statuses)
+        footer = ("\n\nAll good." if not gaps
+                  else f"\n\n{len(gaps)} missing — send /deps install")
+        await update.message.reply_text(
+            "```\n" + "\n".join(lines) + "\n```" + footer,
+            parse_mode=ParseMode.MARKDOWN,
+        )
 
     # ── Message Handlers ───────────────────────────────────
 
@@ -315,8 +438,6 @@ class TelegramJarvis:
         return chunks
 
 
-import time  # needed for uptime
-
 
 def main():
     """Entry point for jarvis-telegram."""
@@ -351,6 +472,9 @@ def main():
             BotCommand("help", "Show commands"),
             BotCommand("status", "Server status"),
             BotCommand("uptime", "Server uptime"),
+            BotCommand("device", "Hardware & GPU info"),
+            BotCommand("nim", "NVIDIA NIM status"),
+            BotCommand("deps", "Dependency health"),
             BotCommand("reset", "Reset conversation"),
             BotCommand("inspect", "Self-inspect code"),
             BotCommand("diff", "Show changes"),

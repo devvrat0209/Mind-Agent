@@ -10,14 +10,19 @@ The repo contains the full `jarvis-agent` Python package. Talk to your bot, and 
 my-agent/
 ├── jarvis-agent/           # The Python package
 │   ├── jarvis/
-│   │   ├── agent.py        # Core agent loop (think → act → observe)
-│   │   ├── cli.py          # CLI + first-run setup wizard
-│   │   ├── config.py       # Config / .env loading
-│   │   ├── llm.py          # LLM calls via LiteLLM
-│   │   ├── memory.py       # Conversation history
-│   │   ├── tools.py        # 23 tools (code + device access)
-│   │   ├── device.py       # Device control helpers
-│   │   └── telegram_bot.py # Telegram bot handler
+│   │   ├── agent.py            # Core agent loop (think → act → observe)
+│   │   ├── cli.py              # CLI (setup / doctor / install / api / bot / nim)
+│   │   ├── wizard.py           # Interactive setup wizard
+│   │   ├── platform_detect.py  # OS / arch / GPU / CUDA detection
+│   │   ├── deps.py             # Dependency check + device-aware auto-install
+│   │   ├── nim.py              # NVIDIA NIM client (hosted + self-hosted)
+│   │   ├── api.py              # FastAPI REST API
+│   │   ├── config.py           # Config / .env loading
+│   │   ├── llm.py              # LLM calls via LiteLLM
+│   │   ├── memory.py           # Conversation history
+│   │   ├── tools.py            # 23 tools (code + device access)
+│   │   ├── device.py           # Device control helpers
+│   │   └── telegram_bot.py     # Telegram bot handler
 │   ├── pyproject.toml
 │   ├── install.sh          # One-liner installer
 │   └── deploy-vps.sh       # VPS deployment script
@@ -31,7 +36,82 @@ pip install jarvis-agent
 jarvis
 ```
 
-First run launches a setup wizard that asks for your LLM and Telegram tokens and saves them. Every run after that starts the Telegram bot.
+First run launches a setup wizard that detects your hardware, installs any
+missing dependencies, and asks for your NVIDIA NIM / Telegram credentials.
+Every run after that starts the Telegram bot.
+
+## Commands
+
+| Command | What it does |
+|---------|--------------|
+| `jarvis` | Setup wizard on first run, then starts the bot |
+| `jarvis setup [section]` | Re-run the wizard (`device`, `deps`, `llm`, `nim`, `telegram`, `api`) |
+| `jarvis doctor` | Check device, dependencies and configuration |
+| `jarvis install [groups]` | Install missing dependencies for this device |
+| `jarvis device [--json]` | Show detected OS / CPU / GPU / CUDA |
+| `jarvis api` | Start the REST API server |
+| `jarvis bot` | Start the Telegram bot |
+| `jarvis nim status\|models\|test` | NVIDIA NIM helpers |
+
+## NVIDIA NIM
+
+JARVIS talks to NVIDIA NIM in two shapes:
+
+- **Hosted** — `https://integrate.api.nvidia.com/v1`, free key from
+  [build.nvidia.com](https://build.nvidia.com). No GPU needed.
+- **Self-hosted** — a NIM container on your own NVIDIA GPU, usually
+  `http://localhost:8000/v1`. The wizard checks your GPU, VRAM and Docker
+  before offering this and prints the `docker run` line if it's not up yet.
+
+```bash
+jarvis setup nim     # configure interactively
+jarvis nim status    # endpoint + key + latency
+jarvis nim models    # what the endpoint actually serves
+jarvis nim test      # end-to-end completion smoke test
+```
+
+The wizard validates the key against `/models` before saving, then offers a
+test completion so you know it works before you leave setup.
+
+## Dependency & device handling
+
+`jarvis doctor` and `jarvis install` check every requirement and install what's
+missing using pip flags picked for the machine you're on:
+
+- **PEP 668** system Python (Debian/Ubuntu/Termux) → `--break-system-packages`, plus `--user` when not root
+- **venv / conda** → installs straight in, no extra flags
+- **Docker / CI** → `--no-cache-dir`
+- **NVIDIA GPU** → torch-style wheels from the matching CUDA index (`cu124`, `cu121`, `cu118`)
+- **AMD** → ROCm index · **Apple Silicon** → default wheels (MPS) · otherwise the CPU index
+
+Detection covers Linux (with distro + package manager), macOS, Windows,
+Android/Termux, WSL and Docker, and reports GPU vendor, name, VRAM, driver and
+CUDA version via `nvidia-smi` / `rocm-smi`.
+
+## REST API
+
+```bash
+jarvis api --host 0.0.0.0 --port 8088
+```
+
+Interactive docs at `/docs`. Set `JARVIS_API_KEY` to require
+`Authorization: Bearer <key>` on every route except `/` and `/health`.
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| `GET` | `/health` | Liveness + dependency/integration status |
+| `GET` | `/device` | Full hardware detection |
+| `GET` | `/deps` | Dependency report |
+| `POST` | `/deps/install` | Install missing dependencies |
+| `GET` | `/nim/status` | NIM connectivity + latency |
+| `GET` | `/nim/models` | Models on the endpoint |
+| `POST` | `/nim/chat` | Direct NIM completion |
+| `POST` | `/nim/test` | NIM smoke test |
+| `GET` | `/telegram/status` | Bot token validity |
+| `POST` | `/telegram/send` | Send a message via the bot |
+| `POST` | `/chat` | Talk to the agent |
+| `POST` | `/reset` | Clear agent memory |
+| `GET` | `/config` | Non-secret config view |
 
 ### One-liner install
 
@@ -57,8 +137,10 @@ journalctl -u jarvis -f
 ## Requirements
 
 - Python 3.10+
-- An LLM provider: **OpenAI**, **Anthropic**, **Ollama** (local), **Groq**, or any LiteLLM-supported endpoint
+- An LLM provider: **NVIDIA NIM**, **OpenAI**, **Anthropic**, **Ollama** (local), **Groq**, or any LiteLLM-supported endpoint
 - A Telegram bot token from [@BotFather](https://t.me/BotFather)
+
+Everything else is installed for you on first run.
 
 ## Configuration
 
@@ -66,10 +148,16 @@ Configuration lives in a `.env` file (see [`.env.example`](jarvis-agent/.env.exa
 
 | Variable | Description |
 |----------|-------------|
-| `JARVIS_LLM` | LLM model, e.g. `openai/gpt-4o` |
+| `JARVIS_LLM` | LLM model, e.g. `nvidia_nim/meta/llama-3.3-70b-instruct` |
+| `NVIDIA_NIM_API_KEY` | NVIDIA NIM key (`nvapi-...`) |
+| `NVIDIA_NIM_API_BASE` | NIM endpoint (default `https://integrate.api.nvidia.com/v1`) |
+| `JARVIS_NIM_MODE` | `hosted` or `local` |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | Provider API key |
 | `JARVIS_TELEGRAM_TOKEN` | Telegram bot token |
 | `JARVIS_TELEGRAM_USERS` | Comma-separated allowed user IDs (empty = anyone) |
+| `JARVIS_API_ENABLED` | `1` to run the REST API alongside the bot |
+| `JARVIS_API_HOST` / `JARVIS_API_PORT` | API bind address (default `127.0.0.1:8088`) |
+| `JARVIS_API_KEY` | Bearer token for the API (blank = no auth) |
 | `JARVIS_AUTO_APPROVE` | Set to `1` to auto-approve self-edits (**dangerous**) |
 
 ## Telegram commands
@@ -83,6 +171,9 @@ Configuration lives in a `.env` file (see [`.env.example`](jarvis-agent/.env.exa
 | `/diff` | See code changes |
 | `/rollback` | Undo the last edit |
 | `/model` | Change LLM |
+| `/device` | Hardware & GPU info |
+| `/nim` | NVIDIA NIM status, or `/nim <model>` to switch |
+| `/deps` | Dependency health, `/deps install` to fix |
 | `/log` | View logs |
 | `/restart` | Restart the service |
 | `/reset` | Reset conversation |
@@ -95,7 +186,9 @@ Send text, photos, files, or voice — JARVIS handles everything.
 - **Code tools** — `read_file`, `write_file`, `edit_file`, `list_files`, `run_code`, `shell`, `search_code`
 - **Device access** — system info, processes, network, disk, screenshot, clipboard, open apps, downloads, notifications
 - **Memory** — keeps conversation history across turns
-- **Multi-provider** — works with any LiteLLM-supported model
+- **Multi-provider** — NVIDIA NIM, OpenAI, Anthropic, Ollama, Groq, or any LiteLLM model
+- **Device-aware setup** — detects OS, arch, GPU and CUDA, then installs deps to match
+- **REST API** — FastAPI server for chat, health, device and NIM control
 
 ## License
 
