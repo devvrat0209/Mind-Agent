@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.agent_state/
+*.sqlite3
+*.bak
+.venv/
+venv/
+.env
+.pytest_cache/
+*.egg-info/
