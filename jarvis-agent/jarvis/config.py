@@ -28,6 +28,18 @@ class Config:
     llm_temperature: float = 0.3
     llm_max_tokens: int = 4096
 
+    # NVIDIA NIM
+    nim_api_key: str = field(default_factory=lambda: os.getenv("NVIDIA_NIM_API_KEY", ""))
+    nim_api_base: str = field(default_factory=lambda: os.getenv(
+        "NVIDIA_NIM_API_BASE", "https://integrate.api.nvidia.com/v1"))
+    nim_mode: str = field(default_factory=lambda: os.getenv("JARVIS_NIM_MODE", "hosted"))
+
+    # REST API
+    api_enabled: bool = field(default_factory=lambda: os.getenv("JARVIS_API_ENABLED", "0") == "1")
+    api_host: str = field(default_factory=lambda: os.getenv("JARVIS_API_HOST", "127.0.0.1"))
+    api_port: int = field(default_factory=lambda: int(os.getenv("JARVIS_API_PORT", "8088")))
+    api_key: str = field(default_factory=lambda: os.getenv("JARVIS_API_KEY", ""))
+
     # Paths
     home_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent.resolve())
     workspace: Path = field(default_factory=lambda: Path.cwd())
@@ -52,3 +64,24 @@ class Config:
     @property
     def is_self_edit_allowed(self) -> bool:
         return True  # always — that's the whole point
+
+    @property
+    def uses_nim(self) -> bool:
+        return self.llm_model.startswith("nvidia_nim/")
+
+    @property
+    def device(self):
+        """Detected hardware for this machine (cached)."""
+        from .platform_detect import device as _device
+        return _device()
+
+    def llm_kwargs(self) -> dict:
+        """Provider-specific extras for the LLM call."""
+        if not self.uses_nim:
+            return {}
+        kw = {"api_base": self.nim_api_base}
+        if self.nim_api_key:
+            kw["api_key"] = self.nim_api_key
+        elif self.nim_mode == "local":
+            kw["api_key"] = "not-needed"   # local containers accept anything
+        return kw

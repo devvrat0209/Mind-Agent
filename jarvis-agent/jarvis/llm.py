@@ -11,10 +11,12 @@ def call_llm(
     tools: Optional[list[dict]] = None,
     temperature: float = 0.3,
     max_tokens: int = 4096,
+    **provider_kwargs,
 ) -> dict:
     """Call any LLM provider via litellm.
 
-    Returns the raw litellm response.
+    `provider_kwargs` carries provider extras such as the `api_base` /
+    `api_key` an NVIDIA NIM endpoint needs. Returns the raw litellm response.
     """
     kwargs = dict(
         model=model,
@@ -22,6 +24,8 @@ def call_llm(
         temperature=temperature,
         max_tokens=max_tokens,
     )
+    kwargs.update({k: v for k, v in provider_kwargs.items() if v is not None})
+
     if tools:
         kwargs["tools"] = tools
         kwargs["tool_choice"] = "auto"
