@@ -8,6 +8,8 @@
     jarvis api             start the REST API server
     jarvis bot             start the Telegram bot
     jarvis nim <sub>       NIM helpers: status | models | test
+    jarvis heartbeat       heartbeat daemon status
+    jarvis heartbeat run <task>   fire a heartbeat task immediately
 """
 
 from __future__ import annotations
@@ -210,6 +212,40 @@ def cmd_nim(args) -> int:
     return 2
 
 
+def cmd_heartbeat(args) -> int:
+    load_env_into_process()
+    from .heartbeat import (create_default_heartbeat, format_status,
+                            read_persisted_state)
+
+    ui = UI()
+    ui.rule("Heartbeat")
+    ui.print()
+
+    if args.hb_command == "run":
+        hb = create_default_heartbeat()
+        if args.task not in hb.tasks:
+            ui.bad(f"Unknown task '{args.task}'")
+            ui.info(f"Tasks: {', '.join(hb.tasks)}")
+            return 2
+        ui.info(f"Running {args.task}…")
+        result = hb.run_task(args.task)
+        (ui.ok if result.ok else ui.bad)(result.summary or "done")
+        if result.alert:
+            ui.warn(result.alert)
+        return 0 if result.ok else 1
+
+    # status (default) — read state persisted by the bot/API process
+    state = read_persisted_state()
+    if state is None:
+        ui.warn("No heartbeat state found — the daemon hasn't run yet.")
+        ui.info("It starts automatically with `jarvis bot` or `jarvis api`.")
+        return 1
+    for line in format_status(state).splitlines():
+        ui.print(f"  {line}")
+    ui.print()
+    return 0
+
+
 # ── bot start ──────────────────────────────────────────────────────────
 
 def start_bot() -> int:
@@ -294,6 +330,12 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("nim", help="NVIDIA NIM helpers")
     s.add_argument("nim_command", choices=["status", "models", "test"])
     s.set_defaults(func=cmd_nim)
+
+    s = sub.add_parser("heartbeat", help="heartbeat daemon status / run a task")
+    s.add_argument("hb_command", nargs="?", default="status",
+                   choices=["status", "run"])
+    s.add_argument("task", nargs="?", help="task name (for `run`)")
+    s.set_defaults(func=cmd_heartbeat)
 
     return p
 

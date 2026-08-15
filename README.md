@@ -20,6 +20,7 @@ my-agent/
 │   │   ├── config.py           # Config / .env loading
 │   │   ├── llm.py              # LLM calls via LiteLLM
 │   │   ├── memory.py           # Conversation history
+│   │   ├── heartbeat.py        # Heartbeat daemon (scheduled background tasks)
 │   │   ├── tools.py            # 23 tools (code + device access)
 │   │   ├── device.py           # Device control helpers
 │   │   └── telegram_bot.py     # Telegram bot handler
@@ -52,6 +53,7 @@ Every run after that starts the Telegram bot.
 | `jarvis api` | Start the REST API server |
 | `jarvis bot` | Start the Telegram bot |
 | `jarvis nim status\|models\|test` | NVIDIA NIM helpers |
+| `jarvis heartbeat [run <task>]` | Heartbeat daemon status, or fire a task now |
 
 ## NVIDIA NIM
 
@@ -112,6 +114,10 @@ Interactive docs at `/docs`. Set `JARVIS_API_KEY` to require
 | `POST` | `/chat` | Talk to the agent |
 | `POST` | `/reset` | Clear agent memory |
 | `GET` | `/config` | Non-secret config view |
+| `GET` | `/heartbeat` | Heartbeat daemon status + task schedule |
+| `POST` | `/heartbeat/start` | Start the heartbeat daemon |
+| `POST` | `/heartbeat/stop` | Stop the heartbeat daemon |
+| `POST` | `/heartbeat/run/{task}` | Fire a heartbeat task immediately |
 
 ### One-liner install
 
@@ -159,6 +165,9 @@ Configuration lives in a `.env` file (see [`.env.example`](jarvis-agent/.env.exa
 | `JARVIS_API_HOST` / `JARVIS_API_PORT` | API bind address (default `127.0.0.1:8088`) |
 | `JARVIS_API_KEY` | Bearer token for the API (blank = no auth) |
 | `JARVIS_AUTO_APPROVE` | Set to `1` to auto-approve self-edits (**dangerous**) |
+| `JARVIS_HEARTBEAT_ENABLED` | `0` to disable the heartbeat daemon (default `1`) |
+| `JARVIS_HEARTBEAT_TICK` | Scheduler resolution in seconds (default `15`) |
+| `JARVIS_HB_<TASK>` | Per-task interval override in seconds, `0` disables (e.g. `JARVIS_HB_HEALTH_CHECK=600`) |
 
 ## Telegram commands
 
@@ -177,6 +186,7 @@ Configuration lives in a `.env` file (see [`.env.example`](jarvis-agent/.env.exa
 | `/log` | View logs |
 | `/restart` | Restart the service |
 | `/reset` | Reset conversation |
+| `/heartbeat` | Heartbeat daemon status, `/heartbeat run <task>` to fire one now |
 
 Send text, photos, files, or voice — JARVIS handles everything.
 
@@ -185,6 +195,7 @@ Send text, photos, files, or voice — JARVIS handles everything.
 - **Self-editing** — modify its own source code, then `git_commit` and `rollback` as needed
 - **Code tools** — `read_file`, `write_file`, `edit_file`, `list_files`, `run_code`, `shell`, `search_code`
 - **Device access** — system info, processes, network, disk, screenshot, clipboard, open apps, downloads, notifications
+- **Heartbeat daemon** — cron-style background tasks (status pings, health checks, LLM/Telegram connectivity, update checks, log rotation) with failure backoff and Telegram alerts, running even while the agent is idle
 - **Memory** — keeps conversation history across turns
 - **Multi-provider** — NVIDIA NIM, OpenAI, Anthropic, Ollama, Groq, or any LiteLLM model
 - **Device-aware setup** — detects OS, arch, GPU and CUDA, then installs deps to match
