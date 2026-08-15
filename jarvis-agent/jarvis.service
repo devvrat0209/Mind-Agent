@@ -1,0 +1,28 @@
+[Unit]
+Description=JARVIS AI Agent — Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jarvis
+Group=jarvis
+WorkingDirectory=/opt/jarvis
+ExecStart=/opt/jarvis/venv/bin/jarvis
+Restart=always
+RestartSec=5
+StartLimitBurst=10
+StartLimitIntervalSec=120
+
+# Load .env
+EnvironmentFile=/opt/jarvis/.env
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=jarvis
+
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

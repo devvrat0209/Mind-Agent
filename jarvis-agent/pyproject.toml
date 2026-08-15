@@ -1,0 +1,24 @@
+[project]
+name = "jarvis-agent"
+version = "0.3.0"
+description = "A self-editing AI agent — JARVIS that modifies its own code, runs on Telegram, has full device access"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "litellm>=1.40.0",
+    "rich>=13.7.0",
+    "prompt-toolkit>=3.0.43",
+    "tiktoken>=0.7.0",
+    "python-telegram-bot>=21.0",
+    "Pillow>=10.0.0",
+    "psutil>=5.9.0",
+    "aiohttp>=3.9.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+jarvis = "jarvis.cli:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
