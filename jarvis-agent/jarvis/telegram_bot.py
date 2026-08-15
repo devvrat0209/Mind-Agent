@@ -29,6 +29,7 @@ from telegram.constants import ParseMode
 
 from .config import Config
 from .agent import Agent
+from .heartbeat import get_heartbeat, heartbeat_enabled, format_status
 
 # Logging — file + stdout for VPS.
 # Fall back to a writable location when /var/log isn't ours (user installs,
@@ -76,6 +77,9 @@ class TelegramJarvis:
         self.agent = Agent(self.config)
         self.authorized_users = self._load_authorized_users()
         self.owner_id: Optional[int] = None  # set on first /start
+        self.heartbeat = get_heartbeat(self.config)
+        self._loop = None                    # asyncio loop, set in post_init
+        self._bot = None                     # telegram bot, set in post_init
 
     def _load_authorized_users(self) -> set[int]:
         raw = os.getenv("JARVIS_TELEGRAM_USERS", "")
@@ -104,6 +108,10 @@ class TelegramJarvis:
         app.add_handler(CommandHandler("device", self.cmd_device))
         app.add_handler(CommandHandler("nim", self.cmd_nim))
         app.add_handler(CommandHandler("deps", self.cmd_deps))
+        app.add_handler(CommandHandler("heartbeat", self.cmd_heartbeat))
+        app.add_handler(CommandHandler("mission", self.cmd_mission))
+        app.add_handler(CommandHandler("work", self.cmd_work))
+        app.add_handler(CommandHandler("journal", self.cmd_journal))
         # Media
         app.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
         app.add_handler(MessageHandler(filters.Document.ALL, self.handle_document))
@@ -336,6 +344,106 @@ class TelegramJarvis:
             parse_mode=ParseMode.MARKDOWN,
         )
 
+    async def cmd_heartbeat(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Heartbeat daemon status; /heartbeat run <task> to fire a task now."""
+        if not self._is_authorized(update.effective_user.id):
+            return
+
+        args = context.args or []
+        if args and args[0] == "run":
+            if len(args) < 2:
+                names = ", ".join(self.heartbeat.tasks)
+                await update.message.reply_text(f"Usage: /heartbeat run <task>\nTasks: {names}")
+                return
+            name = args[1]
+            await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+            result = await asyncio.to_thread(self.heartbeat.run_task, name)
+            mark = "✓" if result.ok else "✗"
+            await update.message.reply_text(f"{mark} {name}: {result.summary or 'done'}")
+            return
+
+        await update.message.reply_text(
+            "🫀 *Heartbeat*\n```\n" + format_status(self.heartbeat.status()) + "\n```",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
+    async def cmd_mission(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Set/show/clear the standing mission for autonomous work.
+
+        /mission                → show current mission
+        /mission <text>         → set the mission
+        /mission clear          → stop autonomous work
+        """
+        if not self._is_authorized(update.effective_user.id):
+            return
+        from . import autonomy
+
+        text = " ".join(context.args or []).strip()
+        if not text:
+            mission = autonomy.get_mission()
+            if mission:
+                task = self.heartbeat.tasks.get("agent_work")
+                every = int(task.interval // 60) if task else 60
+                await update.message.reply_text(
+                    f"🎯 *Current mission* (worked on every {every}m):\n\n{mission}\n\n"
+                    f"_Change:_ `/mission <new text>` · _Stop:_ `/mission clear` · "
+                    f"_Work now:_ `/work`",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+            else:
+                await update.message.reply_text(
+                    "🎯 No mission set — autonomous work is idle.\n\n"
+                    "Give me a standing mission and I'll work on it every "
+                    "heartbeat cycle, even while you're away:\n"
+                    "`/mission Keep the repo tests green and write missing docs`",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+            return
+
+        if text.lower() == "clear":
+            autonomy.clear_mission()
+            await update.message.reply_text("🎯 Mission cleared — autonomous work paused.")
+            return
+
+        autonomy.set_mission(text)
+        await update.message.reply_text(
+            f"🎯 Mission set:\n\n{text}\n\n"
+            f"I'll work on this every heartbeat cycle and report back. "
+            f"Use /work to start a cycle right now.",
+        )
+
+    async def cmd_work(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Run an autonomous work cycle immediately."""
+        if not self._is_authorized(update.effective_user.id):
+            return
+        from . import autonomy
+
+        if not autonomy.get_mission():
+            await update.message.reply_text(
+                "🎯 No mission set. Set one first: `/mission <what to work on>`",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
+
+        await update.message.reply_text("🛠 Starting a work cycle…")
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        result = await asyncio.to_thread(self.heartbeat.run_task, "agent_work")
+        mark = "✓" if result.ok else "✗"
+        for chunk in self._chunk_message(f"{mark} {result.summary or 'done'}", 4000):
+            await update.message.reply_text(chunk)
+
+    async def cmd_journal(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show the tail of the autonomous work journal."""
+        if not self._is_authorized(update.effective_user.id):
+            return
+        from . import autonomy
+
+        tail = autonomy.read_journal(3000)
+        await update.message.reply_text(
+            "📓 *Work journal* (recent)\n```\n" + tail[-3800:] + "\n```",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
     # ── Message Handlers ───────────────────────────────────
 
     async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -404,6 +512,21 @@ class TelegramJarvis:
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
         response = self.agent.chat(f"[Voice message: {path}] Transcribe or process this audio.")
         await update.message.reply_text(response[:4000])
+
+    # ── Heartbeat wiring ───────────────────────────────────
+
+    def _heartbeat_alert(self, task_name: str, message: str):
+        """Called from the heartbeat thread — forwards alerts to the owner."""
+        chat_id = self.owner_id or next(iter(self.authorized_users), None)
+        if not (chat_id and self._bot and self._loop):
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(
+                self._bot.send_message(chat_id=chat_id, text=f"🫀 {message}"),
+                self._loop,
+            )
+        except Exception as e:
+            logger.error(f"Failed to deliver heartbeat alert: {e}")
 
     # ── Helpers ────────────────────────────────────────────
 
@@ -483,8 +606,21 @@ def main():
             BotCommand("shell", "Run shell command"),
             BotCommand("log", "View recent logs"),
             BotCommand("restart", "Restart service"),
+            BotCommand("heartbeat", "Heartbeat daemon status"),
+            BotCommand("mission", "Set/show autonomous work mission"),
+            BotCommand("work", "Run a work cycle now"),
+            BotCommand("journal", "Autonomous work journal"),
         ])
         logger.info("Bot commands registered")
+
+        # start the heartbeat daemon alongside the bot
+        jarvis._loop = asyncio.get_running_loop()
+        jarvis._bot = application.bot
+        if heartbeat_enabled():
+            jarvis.heartbeat.on_alert(jarvis._heartbeat_alert)
+            jarvis.heartbeat.start()
+        else:
+            logger.info("Heartbeat disabled (JARVIS_HEARTBEAT_ENABLED=0)")
 
     app.post_init = post_init
 

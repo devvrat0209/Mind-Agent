@@ -70,6 +70,11 @@ class TelegramSendRequest(BaseModel):
     parse_mode: Optional[str] = "Markdown"
 
 
+class MissionRequest(BaseModel):
+    mission: str = Field(..., min_length=3,
+                         description="Standing mission for autonomous work cycles")
+
+
 # ── app ────────────────────────────────────────────────────────────────
 
 def _api_key() -> str:
@@ -329,6 +334,77 @@ def create_app() -> FastAPI:
         agent().reset()
         return {"status": "reset"}
 
+    # ── heartbeat ──────────────────────────────────────────────────────
+
+    @app.get("/heartbeat", tags=["heartbeat"], dependencies=auth)
+    def heartbeat_status():
+        from .heartbeat import get_heartbeat, read_persisted_state
+        hb = get_heartbeat()
+        if hb.running:
+            return {"source": "live", **hb.status()}
+        persisted = read_persisted_state()
+        if persisted:
+            return {"source": "persisted", **persisted}
+        return {"source": "none", "running": False, "tasks": []}
+
+    @app.post("/heartbeat/start", tags=["heartbeat"], dependencies=auth)
+    def heartbeat_start():
+        from .heartbeat import get_heartbeat
+        hb = get_heartbeat()
+        if hb.running:
+            return {"status": "already running"}
+        hb.start()
+        return {"status": "started", "tasks": list(hb.tasks)}
+
+    @app.post("/heartbeat/stop", tags=["heartbeat"], dependencies=auth)
+    def heartbeat_stop():
+        from .heartbeat import get_heartbeat
+        hb = get_heartbeat()
+        if not hb.running:
+            return {"status": "not running"}
+        hb.stop()
+        return {"status": "stopped"}
+
+    @app.post("/heartbeat/run/{task_name}", tags=["heartbeat"], dependencies=auth)
+    def heartbeat_run(task_name: str):
+        from .heartbeat import get_heartbeat
+        hb = get_heartbeat()
+        if task_name not in hb.tasks:
+            raise HTTPException(404, f"Unknown task '{task_name}'. "
+                                     f"Tasks: {', '.join(hb.tasks)}")
+        result = hb.run_task(task_name)
+        return {"task": task_name, "ok": result.ok, "summary": result.summary,
+                "alert": result.alert or None}
+
+    # ── autonomous work ────────────────────────────────────────────────
+
+    @app.get("/mission", tags=["autonomy"], dependencies=auth)
+    def mission_status():
+        from . import autonomy
+        return autonomy.status()
+
+    @app.post("/mission", tags=["autonomy"], dependencies=auth)
+    def mission_set(req: MissionRequest):
+        from . import autonomy
+        autonomy.set_mission(req.mission)
+        return {"status": "mission set", "mission": req.mission}
+
+    @app.delete("/mission", tags=["autonomy"], dependencies=auth)
+    def mission_clear():
+        from . import autonomy
+        cleared = autonomy.clear_mission()
+        return {"status": "cleared" if cleared else "no mission was set"}
+
+    @app.post("/work", tags=["autonomy"], dependencies=auth)
+    def work_now():
+        from . import autonomy
+        if not autonomy.get_mission():
+            raise HTTPException(400, "No mission set — POST /mission first")
+        t0 = time.time()
+        ok, summary = autonomy.run_work_cycle()
+        return {"ok": ok, "summary": summary,
+                "elapsed_ms": int((time.time() - t0) * 1000)}
+
     @app.get("/config", tags=["meta"], dependencies=auth)
     def config_view():
         cfg = nimmod.NIMConfig.from_env()
@@ -348,8 +424,12 @@ def create_app() -> FastAPI:
 
 
 def serve(host: Optional[str] = None, port: Optional[int] = None, reload: bool = False) -> None:
-    """Start the API server."""
+    """Start the API server (heartbeat daemon runs alongside unless disabled)."""
     import uvicorn
+
+    from .heartbeat import get_heartbeat, heartbeat_enabled
+    if heartbeat_enabled():
+        get_heartbeat().start()      # idempotent — no-op if already running
 
     host = host or os.getenv("JARVIS_API_HOST", "127.0.0.1")
     port = int(port or os.getenv("JARVIS_API_PORT", "8088"))
