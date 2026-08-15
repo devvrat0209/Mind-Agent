@@ -70,6 +70,11 @@ class TelegramSendRequest(BaseModel):
     parse_mode: Optional[str] = "Markdown"
 
 
+class MissionRequest(BaseModel):
+    mission: str = Field(..., min_length=3,
+                         description="Standing mission for autonomous work cycles")
+
+
 # ── app ────────────────────────────────────────────────────────────────
 
 def _api_key() -> str:
@@ -370,6 +375,35 @@ def create_app() -> FastAPI:
         result = hb.run_task(task_name)
         return {"task": task_name, "ok": result.ok, "summary": result.summary,
                 "alert": result.alert or None}
+
+    # ── autonomous work ────────────────────────────────────────────────
+
+    @app.get("/mission", tags=["autonomy"], dependencies=auth)
+    def mission_status():
+        from . import autonomy
+        return autonomy.status()
+
+    @app.post("/mission", tags=["autonomy"], dependencies=auth)
+    def mission_set(req: MissionRequest):
+        from . import autonomy
+        autonomy.set_mission(req.mission)
+        return {"status": "mission set", "mission": req.mission}
+
+    @app.delete("/mission", tags=["autonomy"], dependencies=auth)
+    def mission_clear():
+        from . import autonomy
+        cleared = autonomy.clear_mission()
+        return {"status": "cleared" if cleared else "no mission was set"}
+
+    @app.post("/work", tags=["autonomy"], dependencies=auth)
+    def work_now():
+        from . import autonomy
+        if not autonomy.get_mission():
+            raise HTTPException(400, "No mission set — POST /mission first")
+        t0 = time.time()
+        ok, summary = autonomy.run_work_cycle()
+        return {"ok": ok, "summary": summary,
+                "elapsed_ms": int((time.time() - t0) * 1000)}
 
     @app.get("/config", tags=["meta"], dependencies=auth)
     def config_view():

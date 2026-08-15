@@ -109,6 +109,9 @@ class TelegramJarvis:
         app.add_handler(CommandHandler("nim", self.cmd_nim))
         app.add_handler(CommandHandler("deps", self.cmd_deps))
         app.add_handler(CommandHandler("heartbeat", self.cmd_heartbeat))
+        app.add_handler(CommandHandler("mission", self.cmd_mission))
+        app.add_handler(CommandHandler("work", self.cmd_work))
+        app.add_handler(CommandHandler("journal", self.cmd_journal))
         # Media
         app.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
         app.add_handler(MessageHandler(filters.Document.ALL, self.handle_document))
@@ -364,6 +367,83 @@ class TelegramJarvis:
             parse_mode=ParseMode.MARKDOWN,
         )
 
+    async def cmd_mission(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Set/show/clear the standing mission for autonomous work.
+
+        /mission                → show current mission
+        /mission <text>         → set the mission
+        /mission clear          → stop autonomous work
+        """
+        if not self._is_authorized(update.effective_user.id):
+            return
+        from . import autonomy
+
+        text = " ".join(context.args or []).strip()
+        if not text:
+            mission = autonomy.get_mission()
+            if mission:
+                task = self.heartbeat.tasks.get("agent_work")
+                every = int(task.interval // 60) if task else 60
+                await update.message.reply_text(
+                    f"🎯 *Current mission* (worked on every {every}m):\n\n{mission}\n\n"
+                    f"_Change:_ `/mission <new text>` · _Stop:_ `/mission clear` · "
+                    f"_Work now:_ `/work`",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+            else:
+                await update.message.reply_text(
+                    "🎯 No mission set — autonomous work is idle.\n\n"
+                    "Give me a standing mission and I'll work on it every "
+                    "heartbeat cycle, even while you're away:\n"
+                    "`/mission Keep the repo tests green and write missing docs`",
+                    parse_mode=ParseMode.MARKDOWN,
+                )
+            return
+
+        if text.lower() == "clear":
+            autonomy.clear_mission()
+            await update.message.reply_text("🎯 Mission cleared — autonomous work paused.")
+            return
+
+        autonomy.set_mission(text)
+        await update.message.reply_text(
+            f"🎯 Mission set:\n\n{text}\n\n"
+            f"I'll work on this every heartbeat cycle and report back. "
+            f"Use /work to start a cycle right now.",
+        )
+
+    async def cmd_work(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Run an autonomous work cycle immediately."""
+        if not self._is_authorized(update.effective_user.id):
+            return
+        from . import autonomy
+
+        if not autonomy.get_mission():
+            await update.message.reply_text(
+                "🎯 No mission set. Set one first: `/mission <what to work on>`",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            return
+
+        await update.message.reply_text("🛠 Starting a work cycle…")
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        result = await asyncio.to_thread(self.heartbeat.run_task, "agent_work")
+        mark = "✓" if result.ok else "✗"
+        for chunk in self._chunk_message(f"{mark} {result.summary or 'done'}", 4000):
+            await update.message.reply_text(chunk)
+
+    async def cmd_journal(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show the tail of the autonomous work journal."""
+        if not self._is_authorized(update.effective_user.id):
+            return
+        from . import autonomy
+
+        tail = autonomy.read_journal(3000)
+        await update.message.reply_text(
+            "📓 *Work journal* (recent)\n```\n" + tail[-3800:] + "\n```",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+
     # ── Message Handlers ───────────────────────────────────
 
     async def handle_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -527,6 +607,9 @@ def main():
             BotCommand("log", "View recent logs"),
             BotCommand("restart", "Restart service"),
             BotCommand("heartbeat", "Heartbeat daemon status"),
+            BotCommand("mission", "Set/show autonomous work mission"),
+            BotCommand("work", "Run a work cycle now"),
+            BotCommand("journal", "Autonomous work journal"),
         ])
         logger.info("Bot commands registered")
 

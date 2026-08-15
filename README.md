@@ -21,6 +21,7 @@ my-agent/
 │   │   ├── llm.py              # LLM calls via LiteLLM
 │   │   ├── memory.py           # Conversation history
 │   │   ├── heartbeat.py        # Heartbeat daemon (scheduled background tasks)
+│   │   ├── autonomy.py         # Autonomous work cycles (mission + journal)
 │   │   ├── tools.py            # 23 tools (code + device access)
 │   │   ├── device.py           # Device control helpers
 │   │   └── telegram_bot.py     # Telegram bot handler
@@ -118,6 +119,10 @@ Interactive docs at `/docs`. Set `JARVIS_API_KEY` to require
 | `POST` | `/heartbeat/start` | Start the heartbeat daemon |
 | `POST` | `/heartbeat/stop` | Stop the heartbeat daemon |
 | `POST` | `/heartbeat/run/{task}` | Fire a heartbeat task immediately |
+| `GET` | `/mission` | Current autonomous-work mission + journal tail |
+| `POST` | `/mission` | Set the standing mission |
+| `DELETE` | `/mission` | Clear the mission (pause autonomous work) |
+| `POST` | `/work` | Run an autonomous work cycle now |
 
 ### One-liner install
 
@@ -168,6 +173,9 @@ Configuration lives in a `.env` file (see [`.env.example`](jarvis-agent/.env.exa
 | `JARVIS_HEARTBEAT_ENABLED` | `0` to disable the heartbeat daemon (default `1`) |
 | `JARVIS_HEARTBEAT_TICK` | Scheduler resolution in seconds (default `15`) |
 | `JARVIS_HB_<TASK>` | Per-task interval override in seconds, `0` disables (e.g. `JARVIS_HB_HEALTH_CHECK=600`) |
+| `JARVIS_HB_AGENT_WORK` | Seconds between autonomous work cycles (default `3600`, `0` disables) |
+| `JARVIS_WORK_MAX_CALLS` | Max tool calls per work cycle (default `15`) |
+| `JARVIS_WORK_REPORT` | `0` to journal silently instead of Telegram-reporting each cycle |
 
 ## Telegram commands
 
@@ -187,6 +195,9 @@ Configuration lives in a `.env` file (see [`.env.example`](jarvis-agent/.env.exa
 | `/restart` | Restart the service |
 | `/reset` | Reset conversation |
 | `/heartbeat` | Heartbeat daemon status, `/heartbeat run <task>` to fire one now |
+| `/mission` | Show the standing mission; `/mission <text>` sets it, `/mission clear` stops it |
+| `/work` | Run an autonomous work cycle right now |
+| `/journal` | Recent entries from the autonomous work journal |
 
 Send text, photos, files, or voice — JARVIS handles everything.
 
@@ -196,6 +207,7 @@ Send text, photos, files, or voice — JARVIS handles everything.
 - **Code tools** — `read_file`, `write_file`, `edit_file`, `list_files`, `run_code`, `shell`, `search_code`
 - **Device access** — system info, processes, network, disk, screenshot, clipboard, open apps, downloads, notifications
 - **Heartbeat daemon** — cron-style background tasks (status pings, health checks, LLM/Telegram connectivity, update checks, log rotation) with failure backoff and Telegram alerts, running even while the agent is idle
+- **Autonomous work** — give JARVIS a standing mission (`/mission`) and the heartbeat wakes the agent every hour to make real progress on it with its tools, journaling each cycle and reporting back on Telegram
 - **Memory** — keeps conversation history across turns
 - **Multi-provider** — NVIDIA NIM, OpenAI, Anthropic, Ollama, Groq, or any LiteLLM model
 - **Device-aware setup** — detects OS, arch, GPU and CUDA, then installs deps to match

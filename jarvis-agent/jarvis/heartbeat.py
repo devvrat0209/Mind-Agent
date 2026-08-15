@@ -12,6 +12,9 @@ Default schedule
     telegram_check   every 1 h      bot token still valid (getMe)
     check_updates    every 4 h      git upstream — alerts when behind
     prune_logs       every 24 h     rotate any jarvis log file > 10 MB
+    agent_work       every 1 h      autonomous work cycle on the standing
+                                    mission (~/.jarvis/MISSION.md) — see
+                                    autonomy.py. Idles when no mission set.
 
 Tasks that fail back off exponentially (interval × 2^failures, capped at 6 h)
 so a broken check can't spam alerts. All state is persisted to
@@ -395,6 +398,23 @@ def _task_prune_logs(max_mb: int = 10) -> Callable[[], TaskResult]:
     return run
 
 
+def _task_agent_work(config) -> Callable[[], TaskResult]:
+    """Autonomous work cycle — the agent makes progress on its mission."""
+    def run() -> TaskResult:
+        from . import autonomy
+        ok, summary = autonomy.run_work_cycle(config)
+        if not ok:
+            return TaskResult(ok=False, summary=summary,
+                              alert=f"🛠 Work cycle failed: {summary[:300]}")
+        if summary.startswith("no mission set"):
+            return TaskResult(summary=summary)
+        alert = ""
+        if autonomy.work_report_enabled():
+            alert = f"🛠 {summary[:900]}"
+        return TaskResult(summary=summary[:300], alert=alert)
+    return run
+
+
 # ── factory / singleton ────────────────────────────────────────────────
 
 _instance: Optional[Heartbeat] = None
@@ -419,6 +439,7 @@ def create_default_heartbeat(config=None) -> Heartbeat:
     hb.register("telegram_check", 3600,     _task_telegram_check())
     hb.register("check_updates",  4 * 3600, _task_check_updates(config))
     hb.register("prune_logs",     24 * 3600, _task_prune_logs())
+    hb.register("agent_work",     3600,     _task_agent_work(config))
     return hb
 
 
